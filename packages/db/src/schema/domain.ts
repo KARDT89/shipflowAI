@@ -123,6 +123,30 @@ export const projects = pgTable(
   ]
 )
 
+export const githubInstallations = pgTable(
+  "github_installations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    installationId: text("installation_id").notNull(),
+    accountId: text("account_id").notNull(),
+    accountLogin: text("account_login").notNull(),
+    accountType: text("account_type").notNull(),
+    verifiedBy: text("verified_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("github_installations_installation_id_unique").on(
+      table.installationId
+    ),
+    index("github_installations_organization_idx").on(table.organizationId),
+  ]
+)
+
 export const repositories = pgTable(
   "repositories",
   {
@@ -130,7 +154,11 @@ export const repositories = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    githubInstallationId: text("github_installation_id").notNull(),
+    githubInstallationId: text("github_installation_id")
+      .notNull()
+      .references(() => githubInstallations.installationId, {
+        onDelete: "cascade",
+      }),
     githubRepositoryId: text("github_repository_id").notNull(),
     owner: text("owner").notNull(),
     name: text("name").notNull(),

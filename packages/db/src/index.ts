@@ -1,5 +1,5 @@
 export { db, sql } from "./client"
-export { findMembership } from "./queries/membership"
+export { clearGithubAccountTokens, findMembership } from "./queries/membership"
 export {
   listFeatureRequestsByProject,
   getFeatureRequestById,
@@ -12,14 +12,16 @@ export {
   createWorkspaceWithProject,
 } from "./queries/projects"
 export { getPrdForFeatureRequest } from "./queries/prds"
+export { listTasksByFeatureRequestId, updateTaskStatus } from "./queries/tasks"
 export {
-  listTasksByFeatureRequestId,
-  updateTaskStatus,
-} from "./queries/tasks"
-export {
+  findGithubInstallation,
+  listGithubInstallationsByOrganization,
+  upsertGithubInstallation,
   findRepositoryByGithubId,
   createRepository,
   listRepositoriesByProject,
+  deleteRepositoriesByInstallationId,
+  deleteRepositoriesByGithubIds,
 } from "./queries/repositories"
 export {
   upsertPullRequest,

@@ -15,7 +15,10 @@ export default function SignupPage() {
           </div>
           ShipFlow AI
         </Link>
-        <SignupForm />
+        <SignupForm
+          githubEnabled={Boolean(process.env.GITHUB_APP_CLIENT_ID)}
+          googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID)}
+        />
       </div>
     </div>
   )

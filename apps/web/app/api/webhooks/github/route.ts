@@ -1,9 +1,14 @@
 import {
+  clearGithubAccountTokens,
+  deleteRepositoriesByGithubIds,
+  deleteRepositoriesByInstallationId,
   findRepositoryByGithubId,
   updatePullRequestStatus,
   upsertPullRequest,
 } from "@shipflow/db"
-import { webhooks } from "@shipflow/github"
+import { getWebhooks } from "@shipflow/github"
+
+const webhooks = getWebhooks()
 
 webhooks.on(
   ["pull_request.opened", "pull_request.synchronize", "pull_request.reopened"],
@@ -35,6 +40,21 @@ webhooks.on("pull_request.closed", async ({ payload }) => {
   )
 })
 
+webhooks.on("installation.deleted", async ({ payload }) => {
+  await deleteRepositoriesByInstallationId(String(payload.installation.id))
+})
+
+webhooks.on("installation_repositories.removed", async ({ payload }) => {
+  await deleteRepositoriesByGithubIds(
+    String(payload.installation.id),
+    payload.repositories_removed.map((repository) => String(repository.id))
+  )
+})
+
+webhooks.on("github_app_authorization.revoked", async ({ payload }) => {
+  await clearGithubAccountTokens(String(payload.sender.id))
+})
+
 export async function POST(req: Request) {
   const payload = await req.text()
   const id = req.headers.get("x-github-delivery") ?? ""
@@ -47,7 +67,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    await webhooks.receive({ id, name: name as never, payload: JSON.parse(payload) })
+    await webhooks.receive({
+      id,
+      name: name as never,
+      payload: JSON.parse(payload),
+    })
   } catch (error) {
     console.error("[github webhook] handler error", error)
   }

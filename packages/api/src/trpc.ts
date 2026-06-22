@@ -53,8 +53,22 @@ const requireTenant = t.middleware(({ ctx, next }) => {
   })
 })
 
+const requireOrganizationManager = t.middleware(({ ctx, next }) => {
+  if (!ctx.membership || !["owner", "admin"].includes(ctx.membership.role)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only organization owners and admins can manage GitHub.",
+    })
+  }
+
+  return next({ ctx })
+})
+
 export const createTRPCRouter = t.router
 export const createCallerFactory = t.createCallerFactory
 export const publicProcedure = t.procedure
 export const protectedProcedure = t.procedure.use(requireSession)
 export const tenantProcedure = protectedProcedure.use(requireTenant)
+export const organizationManagerProcedure = tenantProcedure.use(
+  requireOrganizationManager
+)

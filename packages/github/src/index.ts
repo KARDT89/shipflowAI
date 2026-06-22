@@ -1,2 +1,11 @@
-export { githubApp } from "./app"
-export { webhooks } from "./webhooks"
+export {
+  getGitHubApp,
+  getInstallationAccount,
+  getInstallationRepo,
+  getUserInstallation,
+  getUserInstallationRepo,
+  getUserInstallationRepos,
+  listInstallationRepositories,
+  type GitHubRepository,
+} from "./app"
+export { getWebhooks } from "./webhooks"

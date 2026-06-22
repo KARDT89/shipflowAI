@@ -21,10 +21,17 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, type FormEvent } from "react"
 
+import { SocialAuthButtons } from "./social-auth-buttons"
+
 export function SignupForm({
   className,
+  githubEnabled = false,
+  googleEnabled = false,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & {
+  githubEnabled?: boolean
+  googleEnabled?: boolean
+}) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -53,7 +60,9 @@ export function SignupForm({
     setPending(false)
 
     if (result.error) {
-      setError(result.error.message ?? "Could not create account. Please try again.")
+      setError(
+        result.error.message ?? "Could not create account. Please try again."
+      )
       return
     }
 
@@ -123,7 +132,9 @@ export function SignupForm({
                     />
                   </Field>
                 </div>
-                <FieldDescription>Must be at least 8 characters.</FieldDescription>
+                <FieldDescription>
+                  Must be at least 8 characters.
+                </FieldDescription>
               </Field>
               {error ? (
                 <p className="text-sm text-destructive" role="alert">
@@ -136,16 +147,18 @@ export function SignupForm({
                 </Button>
                 <FieldDescription className="text-center">
                   Already have an account?{" "}
-                  <Link
-                    href="/login"
-                    className="underline underline-offset-4"
-                  >
+                  <Link href="/login" className="underline underline-offset-4">
                     Sign in
                   </Link>
                 </FieldDescription>
               </Field>
             </FieldGroup>
           </form>
+          <SocialAuthButtons
+            callbackURL="/dashboard"
+            githubEnabled={githubEnabled}
+            googleEnabled={googleEnabled}
+          />
         </CardContent>
       </Card>
       <FieldDescription className="px-6 text-center">

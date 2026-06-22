@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm"
 
 import { db } from "../client"
-import { member } from "../schema/auth"
+import { account, member } from "../schema/auth"
 
 export async function findMembership({
   userId,
@@ -16,4 +16,20 @@ export async function findMembership({
       eq(member.organizationId, organizationId)
     ),
   })
+}
+
+export async function clearGithubAccountTokens(accountId: string) {
+  return db
+    .update(account)
+    .set({
+      accessToken: null,
+      refreshToken: null,
+      accessTokenExpiresAt: null,
+      refreshTokenExpiresAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(account.providerId, "github"), eq(account.accountId, accountId))
+    )
+    .returning({ id: account.id })
 }

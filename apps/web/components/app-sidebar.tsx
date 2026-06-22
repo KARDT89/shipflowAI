@@ -7,6 +7,12 @@ import {
   AvatarImage,
 } from "@workspace/ui/components/avatar"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -35,6 +41,9 @@ import {
 import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useState } from "react"
+
+import { OrganizationForm } from "@/components/dashboard-actions"
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: RiDashboard3Line },
@@ -51,6 +60,7 @@ export function AppSidebar() {
   const session = authClient.useSession()
   const organizations = authClient.useListOrganizations()
   const activeOrganization = authClient.useActiveOrganization()
+  const [createOrgOpen, setCreateOrgOpen] = useState(false)
 
   async function switchOrganization(id: string) {
     await authClient.organization.setActive({ organizationId: id })
@@ -108,13 +118,19 @@ export function AppSidebar() {
                   </DropdownMenuItem>
                 ))}
                 {orgs.length > 0 && <DropdownMenuSeparator />}
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard?create-org=1">
-                    Create organization
-                  </Link>
+                <DropdownMenuItem onClick={() => setCreateOrgOpen(true)}>
+                  Create organization
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Dialog open={createOrgOpen} onOpenChange={setCreateOrgOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create organization</DialogTitle>
+                </DialogHeader>
+                <OrganizationForm />
+              </DialogContent>
+            </Dialog>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

@@ -13,9 +13,18 @@ import { Skeleton } from "@workspace/ui/components/skeleton"
 import { useRouter } from "next/navigation"
 import { useState, type ChangeEvent, type FormEvent } from "react"
 
+function toSlug(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
 export function OrganizationForm() {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [name, setName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -24,9 +33,13 @@ export function OrganizationForm() {
     setPending(true)
     setError(null)
 
-    const form = new FormData(event.currentTarget)
-    const name = String(form.get("name"))
-    const slug = String(form.get("slug"))
+    const slug = toSlug(name)
+    if (!slug) {
+      setError("Organization name must contain at least one letter or number.")
+      setPending(false)
+      return
+    }
+
     const result = await authClient.organization.create({
       name,
       slug,
@@ -58,6 +71,8 @@ export function OrganizationForm() {
     router.refresh()
   }
 
+  const slug = toSlug(name)
+
   return (
     <form onSubmit={handleSubmit} className="max-w-md">
       <FieldGroup>
@@ -67,18 +82,15 @@ export function OrganizationForm() {
             id="organization-name"
             name="name"
             placeholder="Acme Engineering"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             required
           />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="organization-slug">Slug</FieldLabel>
-          <Input
-            id="organization-slug"
-            name="slug"
-            placeholder="acme-engineering"
-            pattern="[a-z0-9-]+"
-            required
-          />
+          {slug ? (
+            <p className="text-xs text-muted-foreground">
+              Slug: <span className="font-mono">{slug}</span>
+            </p>
+          ) : null}
         </Field>
         {error ? (
           <p className="text-sm text-destructive" role="alert">

@@ -152,6 +152,9 @@ importers:
       '@shipflow/db':
         specifier: workspace:*
         version: link:../db
+      '@shipflow/github':
+        specifier: workspace:*
+        version: link:../github
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@5.9.3)
@@ -308,6 +311,9 @@ importers:
       '@workspace/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      eslint:
+        specifier: ^9.39.4
+        version: 9.39.4(jiti@2.7.0)
       typescript:
         specifier: ^5
         version: 5.9.3

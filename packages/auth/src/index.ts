@@ -5,6 +5,8 @@ import { organization } from "better-auth/plugins"
 
 const githubClientId = process.env.GITHUB_APP_CLIENT_ID
 const githubClientSecret = process.env.GITHUB_APP_CLIENT_SECRET
+const googleClientId = process.env.GOOGLE_CLIENT_ID
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET
 
 export const auth = betterAuth({
   appName: "ShipFlow AI",
@@ -16,15 +18,35 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
-  socialProviders:
-    githubClientId && githubClientSecret
+  account: {
+    encryptOAuthTokens: true,
+    storeStateStrategy: "database",
+    accountLinking: {
+      enabled: true,
+      allowDifferentEmails: true,
+    },
+  },
+  session: {
+    freshAge: 60 * 15,
+  },
+  socialProviders: {
+    ...(githubClientId && githubClientSecret
       ? {
           github: {
             clientId: githubClientId,
             clientSecret: githubClientSecret,
           },
         }
-      : undefined,
+      : {}),
+    ...(googleClientId && googleClientSecret
+      ? {
+          google: {
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+          },
+        }
+      : {}),
+  },
   plugins: [
     organization({
       schema: {

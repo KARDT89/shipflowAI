@@ -1,5 +1,10 @@
 import { Webhooks } from "@octokit/webhooks"
 
-export const webhooks = new Webhooks({
-  secret: process.env.GITHUB_WEBHOOK_SECRET ?? "",
-})
+let webhooks: Webhooks | undefined
+
+export function getWebhooks() {
+  const secret = process.env.GITHUB_WEBHOOK_SECRET
+  if (!secret) throw new Error("GitHub webhook secret is not configured")
+  webhooks ??= new Webhooks({ secret })
+  return webhooks
+}

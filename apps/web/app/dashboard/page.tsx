@@ -1,4 +1,8 @@
 import { auth } from "@shipflow/auth"
+import {
+  findMembership,
+  listGithubInstallationsByOrganization,
+} from "@shipflow/db"
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 import {
   Breadcrumb,
@@ -12,16 +16,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@workspace/ui/components/empty"
 import { Separator } from "@workspace/ui/components/separator"
 import { SidebarTrigger } from "@workspace/ui/components/sidebar"
 import { headers } from "next/headers"
 
+import { OrganizationForm } from "@/components/dashboard-actions"
 import { FeatureRequestsPanel } from "@/components/feature-requests-panel"
 import { getQueryClient, trpc } from "@/trpc/server"
 
@@ -35,8 +34,22 @@ const metricTiles = [
 ]
 
 export default async function DashboardPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const requestHeaders = await headers()
+  const session = await auth.api.getSession({ headers: requestHeaders })
   const queryClient = getQueryClient()
+  const organizationId = session?.session.activeOrganizationId
+
+  const [accounts, installations, membership] = session
+    ? await Promise.all([
+        auth.api.listUserAccounts({ headers: requestHeaders }),
+        organizationId
+          ? listGithubInstallationsByOrganization(organizationId)
+          : Promise.resolve([]),
+        organizationId
+          ? findMembership({ userId: session.user.id, organizationId })
+          : Promise.resolve(null),
+      ])
+    : [[], [], null]
 
   if (session?.session.activeOrganizationId) {
     await queryClient.prefetchQuery(trpc.projects.list.queryOptions())
@@ -83,18 +96,26 @@ export default async function DashboardPage() {
 
         {hasOrg ? (
           <HydrationBoundary state={dehydrate(queryClient)}>
-            <FeatureRequestsPanel />
+            <FeatureRequestsPanel
+              canManageGitHub={Boolean(
+                membership && ["owner", "admin"].includes(membership.role)
+              )}
+              githubAccountLinked={accounts.some(
+                (account) => account.providerId === "github"
+              )}
+              githubAppInstalled={installations.length > 0}
+            />
           </HydrationBoundary>
         ) : (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>No organization selected</EmptyTitle>
-              <EmptyDescription>
-                Select or create an organization using the switcher in the
-                sidebar to get started.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <div className="flex flex-col gap-4 max-w-md">
+            <div>
+              <h2 className="text-base font-medium">Create your organization</h2>
+              <p className="text-sm text-muted-foreground">
+                Get started by creating an organization to manage your projects.
+              </p>
+            </div>
+            <OrganizationForm />
+          </div>
         )}
       </div>
     </div>

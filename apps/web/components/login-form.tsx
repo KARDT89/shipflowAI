@@ -14,7 +14,6 @@ import {
   FieldDescription,
   FieldGroup,
   FieldLabel,
-  FieldSeparator,
 } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
@@ -22,10 +21,19 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, type FormEvent } from "react"
 
+import { SocialAuthButtons } from "./social-auth-buttons"
+
 export function LoginForm({
   className,
+  callbackURL = "/dashboard",
+  githubEnabled = false,
+  googleEnabled = false,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & {
+  callbackURL?: string
+  githubEnabled?: boolean
+  googleEnabled?: boolean
+}) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -44,11 +52,13 @@ export function LoginForm({
     setPending(false)
 
     if (result.error) {
-      setError(result.error.message ?? "Authentication failed. Please try again.")
+      setError(
+        result.error.message ?? "Authentication failed. Please try again."
+      )
       return
     }
 
-    router.push("/dashboard")
+    router.push(callbackURL)
     router.refresh()
   }
 
@@ -97,16 +107,18 @@ export function LoginForm({
                 </Button>
                 <FieldDescription className="text-center">
                   Don&apos;t have an account?{" "}
-                  <Link
-                    href="/signup"
-                    className="underline underline-offset-4"
-                  >
+                  <Link href="/signup" className="underline underline-offset-4">
                     Create one
                   </Link>
                 </FieldDescription>
               </Field>
             </FieldGroup>
           </form>
+          <SocialAuthButtons
+            callbackURL={callbackURL}
+            githubEnabled={githubEnabled}
+            googleEnabled={googleEnabled}
+          />
         </CardContent>
       </Card>
       <FieldDescription className="px-6 text-center">

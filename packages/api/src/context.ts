@@ -6,6 +6,7 @@ export type Membership = typeof member.$inferSelect
 
 export type TRPCContext = {
   db: Database
+  headers: Headers
   session: Session | null
   activeOrganizationId: string | null
   membership: Membership | null
@@ -15,15 +16,18 @@ type CreateContextFromSessionOptions = {
   session: Session | null
   database?: Database
   membership?: Membership | null
+  headers?: Headers
 }
 
 export function createContextFromSession({
   session,
   database = db,
   membership = null,
+  headers = new Headers(),
 }: CreateContextFromSessionOptions): TRPCContext {
   return {
     db: database,
+    headers,
     session,
     activeOrganizationId: session?.session.activeOrganizationId ?? null,
     membership,
@@ -46,5 +50,5 @@ export async function createTRPCContext({
         })
       : null
 
-  return createContextFromSession({ session, membership })
+  return createContextFromSession({ session, membership, headers })
 }

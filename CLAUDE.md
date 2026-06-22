@@ -1,6 +1,6 @@
 # ShipFlow AI — Delta Tracker
 
-Last updated: 2026-06-23 (session 4)
+Last updated: 2026-06-23 (session 5)
 
 For ui related context refer to : docs/ui-spec.md
 
@@ -29,10 +29,58 @@ For ui related context refer to : docs/ui-spec.md
 | PRD + Tasks data layer | DB queries + tRPC routers; FR detail PRD and Tasks tabs live | `packages/db/src/queries/prds.ts`, `packages/db/src/queries/tasks.ts`, `packages/api/src/routers/prds.ts`, `packages/api/src/routers/tasks.ts` |
 | **GitHub App + webhooks** | `@shipflow/github` package; HMAC-verified POST handler; `pull_request` events → `pullRequests` table | `packages/github/src/`, `apps/web/app/api/webhooks/github/route.ts`, `packages/db/src/queries/repositories.ts`, `packages/db/src/queries/pullRequests.ts` |
 | **Repo → project linking** | `repositories.link` + `repositories.listByProject` tRPC router; `createRepository` + `listRepositoriesByProject` DB queries; "Link repository" dialog on dashboard | `packages/api/src/routers/repositories.ts`, `packages/db/src/queries/repositories.ts`, `apps/web/components/feature-requests-panel.tsx` |
+| **GitHub App install flow** | End-to-end GitHub App installation + repo assignment working: org creation, OAuth link, app install, setup page, repo → project linking | See session 5 below |
 
 ---
 
-## What was built this session (2026-06-23 — Repo → project linking, session 4)
+## What was built this session (2026-06-23 — GitHub install flow fixes, session 5)
+
+### Create organization flow (`apps/web/components/app-sidebar.tsx`, `apps/web/app/dashboard/page.tsx`, `apps/web/components/dashboard-actions.tsx`)
+- Sidebar "Create organization" DropdownMenuItem was a dead link to `/dashboard?create-org=1` (no handler existed) → replaced with a controlled Dialog containing `OrganizationForm`
+- Dashboard empty state (no active org) was static text → replaced with `OrganizationForm` directly so new users can act immediately
+- `OrganizationForm`: removed manual slug field; slug is now auto-generated from the name (`toSlug()` — lowercase, hyphens, strip non-alphanumeric)
+
+### GitHub OAuth login redirect (`apps/web/components/social-auth-buttons.tsx`)
+- "Continue with GitHub" on login/signup was hardcoding `callbackURL = "/github/install"` for GitHub — this sent users through the GitHub App installation flow instead of just signing them in
+- Fixed: all providers now use the same `callbackURL` prop (typically `/dashboard`)
+
+### Auth config (`packages/auth/src/index.ts`)
+- `allowDifferentEmails: false` → `true` so users can link a GitHub account whose email differs from their app account email
+
+### GitHub App setup page (`apps/web/app/github/setup/page.tsx`)
+- Added pre-flight check: if the user has no GitHub account linked, show a "Link GitHub account" action button instead of crashing
+- `loadVerifiedSetup` previously called `auth.api.getAccessToken` to retrieve the user's stored OAuth token — this failed because `encryptOAuthTokens: true` requires decryption that broke during the multi-redirect install chain
+- Rewrote `loadVerifiedSetup` to use GitHub App-level auth entirely (no user OAuth token):
+  - `getInstallationAccount(installationNumber)` — App JWT → `GET /app/installations/{id}`
+  - `listInstallationRepositories(installationNumber)` — installation token → `GET /installation/repositories`
+- Removed `requestHeaders` from `loadVerifiedSetup` signature (was only needed for `getAccessToken`)
+- Added `console.error` to catch block so real errors appear in server logs
+- Improved `ErrorState`: optional `action` prop adds a recovery button; all error paths now show "Connect GitHub again" → `/github/install`
+
+### GitHub package (`packages/github/src/app.ts`, `packages/github/src/index.ts`)
+- Added `getInstallationAccount(installationId: number)` — uses `app.octokit` (App JWT) to call `GET /app/installations/{id}`; returns account or `null`
+- Added `listInstallationRepositories(installationId: number)` — uses `app.getInstallationOctokit()` (installation token) to paginate `GET /installation/repositories`
+- Added `getInstallationRepo(installationId, repositoryId)` — finds a single repo from `listInstallationRepositories` by ID
+- Fixed `getUserInstallationRepos` pagination bug: bare `return repositories` after the `if` block was short-circuiting the `while` loop after the first page (should be `page += 1`)
+- All three new functions exported from `src/index.ts`
+
+### Repositories tRPC router (`packages/api/src/routers/repositories.ts`)
+- `repositories.link` was using `auth.api.getAccessToken` + `getUserInstallationRepo` (user OAuth) to verify repos — same token failure as the setup page
+- Removed `auth` import and user-token block entirely; now uses `getInstallationRepo(installationId, repositoryId)` via app-level installation token
+
+### GitHub App configuration required (not code)
+- **Setup URL** in GitHub App settings must be set to `{app_url}/github/setup` with "Redirect on update" checked — without this, GitHub drops users on `github.com/settings/installations/{id}` after installation
+- If the app is already installed, navigate directly to `/github/setup?installation_id={id}` to complete setup
+
+### Verified working (typecheck)
+- `pnpm --filter @shipflow/github typecheck` ✅
+- `pnpm --filter @shipflow/api typecheck` ✅
+- `pnpm --filter web typecheck` ✅
+- Full flow verified: org creation → GitHub OAuth link → App install → `/github/setup` → repo assignment → dashboard shows `githubAppInstalled=true`
+
+---
+
+## What was built previously (2026-06-23 — Repo → project linking, session 4)
 
 ### Repositories tRPC router (`packages/api/src/routers/repositories.ts`)
 - `repositories.link` — `tenantProcedure`; validates `projectId` belongs to active org via `listProjectsByOrg`; inserts into `repositories` table; returns the created row
@@ -139,7 +187,7 @@ Event handlers registered at module level:
 | 6 | Billing (Polar) | ❌ Not started |
 | 7 | Polish + deploy + demo | ❌ Not started |
 
-**Overall: ~35–40% of PRD surface implemented.**
+**Overall: ~40–45% of PRD surface implemented.**
 
 ---
 
@@ -148,9 +196,10 @@ Event handlers registered at module level:
 | Area | Gap | Depends on |
 |------|-----|------------|
 | **Repo → project linking** | ✅ Done (session 4) | — |
+| **GitHub App install flow** | ✅ Done (session 5) — org creation, OAuth, install, setup, repo assignment all working end-to-end | — |
 | **Inngest package** | `packages/inngest/` is empty — no event definitions, no workflow functions | Repo linked to project (so PR webhooks persist) |
 | **AI package** | `packages/ai/` is empty — no prompts, no Zod schemas, no structured output calls | Inngest wired |
-| **GitHub diff fetcher** | `packages/github/` has no Octokit installation client, no diff fetcher, no PR comment poster | Inngest workflow triggering it |
+| **GitHub diff fetcher** | PR diffs can now be fetched via `app.getInstallationOctokit()` (installation token available); diff fetcher + PR comment poster not yet implemented | Inngest workflow triggering it |
 | **PRD generation workflow** | No Inngest function to take a feature request → call AI → write PRD + tasks to DB | AI + Inngest |
 | **Code review workflow** | No review run creation, no issue parsing, no re-review loop, no `reviewRuns` rows | All AI/Inngest |
 | **FR detail tabs 4–5** | Review History / Audit Log are `<ComingSoon />` stubs | `lifecycleEvents` rows (written by AI workflows) |
@@ -272,8 +321,9 @@ Step 1: Monorepo + auth          ✅ Done
 Step 2: Feature request CRUD     ✅ Done
 Step 3: Feature request detail   ✅ Done (Overview + PRD + Tasks live; Reviews/Audit stubbed)
 Step 4: GitHub App + webhooks    ✅ Done (HMAC verified; pull_request → pullRequests table)
-Step 4b: Repo → project linking  ← DO THIS NEXT (repositories table empty; blocks all PR persistence)
-Step 5: Inngest wiring           ← after 4b (webhook → Inngest event → lifecycleEvents first data)
+Step 4b: Repo → project linking  ✅ Done (session 4)
+Step 4c: GitHub App install flow ✅ Done (session 5) — org creation, OAuth link, setup, repo assignment
+Step 5: Inngest wiring           ← DO THIS NEXT (webhook → Inngest event → lifecycleEvents first data)
 Step 6: AI SDK integration       ← after 5 (PRD generation + code review functions)
 Step 7: Billing                  ← after 5 (credit enforcement in Inngest functions)
 Step 8: Polish + demo
