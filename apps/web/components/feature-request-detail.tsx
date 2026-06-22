@@ -1,6 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Badge } from "@workspace/ui/components/badge"
 import {
   Card,
   CardContent,
@@ -49,10 +50,165 @@ function DetailSkeleton() {
   )
 }
 
+const PRD_STATUS_LABEL: Record<string, string> = {
+  draft: "Draft",
+  approved: "Approved",
+  revision_requested: "Revision Requested",
+}
+
 function ComingSoon() {
   return (
     <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
       Coming soon
+    </div>
+  )
+}
+
+function PrdTab({ featureRequestId }: { featureRequestId: string }) {
+  const trpc = useTRPC()
+  const { data: prd, isPending } = useQuery(
+    trpc.prds.getByFeatureRequestId.queryOptions({ featureRequestId })
+  )
+
+  if (isPending) return <Skeleton className="h-48 w-full" />
+
+  if (!prd) {
+    return (
+      <Card>
+        <CardContent className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+          PRD not yet generated. It will appear here once the AI workflow runs.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const sections: { label: string; value: string | string[] }[] = [
+    { label: "Problem Statement", value: prd.problemStatement },
+    { label: "Goals", value: prd.goals },
+    { label: "Non-Goals", value: prd.nonGoals },
+    { label: "User Stories", value: prd.userStories },
+    { label: "Acceptance Criteria", value: prd.acceptanceCriteria },
+    { label: "Edge Cases", value: prd.edgeCases },
+    { label: "Success Metrics", value: prd.successMetrics },
+  ]
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary">{PRD_STATUS_LABEL[prd.status] ?? prd.status}</Badge>
+        <span className="text-xs text-muted-foreground">v{prd.version}</span>
+      </div>
+      {sections.map(({ label, value }) => {
+        if (Array.isArray(value) && value.length === 0) return null
+        return (
+          <Card key={label}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {Array.isArray(value) ? (
+                <ul className="list-disc space-y-1 pl-4 text-sm">
+                  {value.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm">{value}</p>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
+  )
+}
+
+const TASK_STATUS_NEXT: Record<string, "todo" | "in_progress" | "done"> = {
+  todo: "in_progress",
+  in_progress: "done",
+  done: "todo",
+}
+
+const TASK_STATUS_ICON: Record<string, string> = {
+  todo: "ri-checkbox-blank-circle-line",
+  in_progress: "ri-refresh-line",
+  done: "ri-checkbox-circle-line",
+}
+
+const TASK_STATUS_LABEL: Record<string, string> = {
+  todo: "To Do",
+  in_progress: "In Progress",
+  done: "Done",
+}
+
+function TasksTab({ featureRequestId }: { featureRequestId: string }) {
+  const trpc = useTRPC()
+  const trpcClient = useTRPCClient()
+  const queryClient = useQueryClient()
+
+  const tasksQuery = trpc.tasks.listByFeatureRequest.queryOptions({ featureRequestId })
+  const { data: tasks, isPending } = useQuery(tasksQuery)
+
+  const statusMutation = useMutation({
+    mutationFn: ({
+      id,
+      status,
+    }: {
+      id: string
+      status: "todo" | "in_progress" | "done"
+    }) => trpcClient.tasks.updateStatus.mutate({ id, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tasksQuery.queryKey })
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(`Could not update task. ${err.message ?? "Try again."}`)
+    },
+  })
+
+  if (isPending) return <Skeleton className="h-48 w-full" />
+
+  if (!tasks || tasks.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+          Tasks will appear here after the PRD is approved.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {tasks.map((task) => (
+        <Card key={task.id}>
+          <CardContent className="flex items-start gap-3 py-4">
+            <button
+              className="mt-0.5 shrink-0 text-lg text-muted-foreground hover:text-foreground disabled:opacity-50"
+              disabled={statusMutation.isPending}
+              title={`Mark as ${TASK_STATUS_LABEL[TASK_STATUS_NEXT[task.status] ?? "todo"]}`}
+              onClick={() =>
+                statusMutation.mutate({
+                  id: task.id,
+                  status: TASK_STATUS_NEXT[task.status] ?? "todo",
+                })
+              }
+            >
+              <i className={TASK_STATUS_ICON[task.status]} />
+            </button>
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm font-medium leading-snug">{task.title}</p>
+              {task.description && (
+                <p className="text-xs text-muted-foreground">{task.description}</p>
+              )}
+            </div>
+            <Badge variant="outline" className="ml-auto shrink-0 text-xs">
+              {TASK_STATUS_LABEL[task.status]}
+            </Badge>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }
@@ -153,11 +309,11 @@ export function FeatureRequestDetail({ id }: { id: string }) {
         </TabsContent>
 
         <TabsContent value="prd" className="mt-6">
-          <ComingSoon />
+          <PrdTab featureRequestId={id} />
         </TabsContent>
 
         <TabsContent value="tasks" className="mt-6">
-          <ComingSoon />
+          <TasksTab featureRequestId={id} />
         </TabsContent>
 
         <TabsContent value="reviews" className="mt-6">

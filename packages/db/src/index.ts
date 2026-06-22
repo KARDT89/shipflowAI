@@ -11,4 +11,9 @@ export {
   listProjectsByOrg,
   createWorkspaceWithProject,
 } from "./queries/projects"
+export { getPrdForFeatureRequest } from "./queries/prds"
+export {
+  listTasksByFeatureRequestId,
+  updateTaskStatus,
+} from "./queries/tasks"
 export * from "./schema/index"
