@@ -1,4 +1,5 @@
 import "@workspace/ui/globals.css"
+import { Toaster } from "@workspace/ui/components/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { TRPCReactProvider } from "@/trpc/client"
 
@@ -12,6 +13,7 @@ export default function RootLayout({
       <body>
         <TRPCReactProvider>
           <ThemeProvider>{children}</ThemeProvider>
+          <Toaster />
         </TRPCReactProvider>
       </body>
     </html>

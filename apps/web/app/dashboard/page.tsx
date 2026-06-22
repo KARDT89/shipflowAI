@@ -15,6 +15,7 @@ import {
   OrganizationPanel,
   SignOutButton,
 } from "@/components/dashboard-actions"
+import { FeatureRequestsPanel } from "@/components/feature-requests-panel"
 import { TenantHealthCard } from "@/components/tenant-health-card"
 import { getQueryClient, trpc } from "@/trpc/server"
 
@@ -30,7 +31,10 @@ export default async function DashboardPage() {
   const queryClient = getQueryClient()
 
   if (session.session.activeOrganizationId) {
-    await queryClient.prefetchQuery(trpc.health.authenticated.queryOptions())
+    await Promise.all([
+      queryClient.prefetchQuery(trpc.health.authenticated.queryOptions()),
+      queryClient.prefetchQuery(trpc.projects.list.queryOptions()),
+    ])
   }
 
   return (
@@ -84,6 +88,12 @@ export default async function DashboardPage() {
           </Card>
         )}
       </section>
+
+      {session.session.activeOrganizationId ? (
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <FeatureRequestsPanel />
+        </HydrationBoundary>
+      ) : null}
     </main>
   )
 }

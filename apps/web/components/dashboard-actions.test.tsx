@@ -111,11 +111,11 @@ describe("organization selection", () => {
       target: { value: "org-2" },
     })
 
-    await waitFor(() =>
+    await waitFor(() => {
       expect(mocks.setActive).toHaveBeenCalledWith({ organizationId: "org-2" })
-    )
-    expect(clear).toHaveBeenCalledOnce()
-    expect(mocks.refresh).toHaveBeenCalledOnce()
+      expect(clear).toHaveBeenCalledOnce()
+      expect(mocks.refresh).toHaveBeenCalledOnce()
+    })
   })
 
   it("activates a newly created organization", async () => {
