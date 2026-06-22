@@ -1,99 +1,102 @@
 import { auth } from "@shipflow/auth"
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
-import { Badge } from "@workspace/ui/components/badge"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+} from "@workspace/ui/components/breadcrumb"
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-
 import {
-  OrganizationPanel,
-  SignOutButton,
-} from "@/components/dashboard-actions"
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@workspace/ui/components/empty"
+import { Separator } from "@workspace/ui/components/separator"
+import { SidebarTrigger } from "@workspace/ui/components/sidebar"
+import { headers } from "next/headers"
+
 import { FeatureRequestsPanel } from "@/components/feature-requests-panel"
-import { TenantHealthCard } from "@/components/tenant-health-card"
 import { getQueryClient, trpc } from "@/trpc/server"
 
 export const dynamic = "force-dynamic"
 
+const metricTiles = [
+  { label: "Active reviews", value: "—" },
+  { label: "Pending approval", value: "—" },
+  { label: "In development", value: "—" },
+  { label: "Shipped", value: "—" },
+]
+
 export default async function DashboardPage() {
   const session = await auth.api.getSession({ headers: await headers() })
-
-  if (!session) {
-    redirect("/login")
-  }
-
   const queryClient = getQueryClient()
 
-  if (session.session.activeOrganizationId) {
-    await Promise.all([
-      queryClient.prefetchQuery(trpc.health.authenticated.queryOptions()),
-      queryClient.prefetchQuery(trpc.projects.list.queryOptions()),
-    ])
+  if (session?.session.activeOrganizationId) {
+    await queryClient.prefetchQuery(trpc.projects.list.queryOptions())
   }
 
+  const hasOrg = Boolean(session?.session.activeOrganizationId)
+
   return (
-    <main className="mx-auto min-h-svh max-w-6xl px-6 py-10">
-      <header className="flex items-center justify-between gap-6">
-        <div>
-          <p className="text-sm text-muted-foreground">ShipFlow AI</p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome, {session.user.name}
-          </h1>
-        </div>
-        <SignOutButton />
+    <div className="flex flex-1 flex-col">
+      <header className="flex h-14 shrink-0 items-center gap-2 px-4">
+        <SidebarTrigger className="-ml-1" />
+        <Separator orientation="vertical" className="mx-2 h-4" />
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage>Dashboard</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
       </header>
 
-      <section className="mt-12 grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-4">
-              <CardTitle>Organization</CardTitle>
-              <Badge
-                variant={
-                  session.session.activeOrganizationId ? "default" : "secondary"
-                }
-              >
-                {session.session.activeOrganizationId
-                  ? "Active"
-                  : "Setup required"}
-              </Badge>
-            </div>
-            <CardDescription>
-              Organizations own workspaces, projects, repositories, and billing.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <OrganizationPanel />
-          </CardContent>
-        </Card>
+      <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
+        <div>
+          <h1 className="text-xl font-medium">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Feature requests across all projects
+          </p>
+        </div>
 
-        {session.session.activeOrganizationId ? (
+        <Separator />
+
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {metricTiles.map((tile) => (
+            <Card key={tile.label}>
+              <CardHeader>
+                <CardDescription>{tile.label}</CardDescription>
+                <CardTitle className="text-2xl tabular-nums">
+                  {tile.value}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+
+        {hasOrg ? (
           <HydrationBoundary state={dehydrate(queryClient)}>
-            <TenantHealthCard />
+            <FeatureRequestsPanel />
           </HydrationBoundary>
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Tenant API</CardTitle>
-              <CardDescription>
-                Select or create an organization to enable tenant access.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>No organization selected</EmptyTitle>
+              <EmptyDescription>
+                Select or create an organization using the switcher in the
+                sidebar to get started.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
-      </section>
-
-      {session.session.activeOrganizationId ? (
-        <HydrationBoundary state={dehydrate(queryClient)}>
-          <FeatureRequestsPanel />
-        </HydrationBoundary>
-      ) : null}
-    </main>
+      </div>
+    </div>
   )
 }
