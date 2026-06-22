@@ -34,11 +34,14 @@ import {
   RiDashboard3Line,
   RiGithubLine,
   RiLogoutBoxLine,
+  RiMoonLine,
   RiProjectorLine,
   RiSettings3Line,
   RiShipLine,
+  RiSunLine,
 } from "@remixicon/react"
 import { useQueryClient } from "@tanstack/react-query"
+import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useState } from "react"
@@ -61,6 +64,7 @@ export function AppSidebar() {
   const organizations = authClient.useListOrganizations()
   const activeOrganization = authClient.useActiveOrganization()
   const [createOrgOpen, setCreateOrgOpen] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
 
   async function switchOrganization(id: string) {
     await authClient.organization.setActive({ organizationId: id })
@@ -183,6 +187,19 @@ export function AppSidebar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem disabled>Account settings</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() =>
+                    setTheme(resolvedTheme === "dark" ? "light" : "dark")
+                  }
+                >
+                  {resolvedTheme === "dark" ? (
+                    <RiSunLine className="size-4" aria-hidden />
+                  ) : (
+                    <RiMoonLine className="size-4" aria-hidden />
+                  )}
+                  {resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut}>
                   <RiLogoutBoxLine className="size-4" aria-hidden />
