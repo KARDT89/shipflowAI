@@ -69,6 +69,21 @@
 - `msw`: test-only API and webhook fixtures; production will have no synthetic PR path.
 - `@playwright/test`: authentication and lifecycle browser tests.
 
+## Current Status (2026-06-23)
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 1 | Monorepo scaffold + shared config + linting + tests | ✅ Done |
+| 2 | Drizzle schema + Better Auth + organizations + protected dashboard | ✅ Done |
+| 3 | tRPC context + tenant middleware + React Query hydration | ✅ Done |
+| 4 | Projects, repositories, feature requests, PRDs, tasks, lifecycle events | ✅ Done (data layer + tRPC routers + UI tabs) |
+| 4b | Repo → project linking (repositories tRPC router + Link Repository UI) | ✅ Done (session 4) |
+| 5 | GitHub App installation + webhook flow | ✅ Done (HMAC-verified; PR events → pullRequests) |
+| 6 | Inngest workflows + OpenRouter AI calls | ❌ Next |
+| 7 | Feature-request lifecycle screens, review history, approval flow | ⚠️ Partial (Overview/PRD/Tasks live; Reviews/Audit stubbed) |
+| 8 | Polar billing + credit enforcement | ❌ Pending |
+| 9 | Deploy to Vercel + polish | ❌ Pending |
+
 ## Build Order
 
 1. Scaffold the monorepo, Next.js 16, shared configuration, Shadcn UI package, linting, tests, and environment validation.

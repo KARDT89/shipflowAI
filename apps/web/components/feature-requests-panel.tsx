@@ -26,6 +26,13 @@ import {
 } from "@workspace/ui/components/empty"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 import { Separator } from "@workspace/ui/components/separator"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { Spinner } from "@workspace/ui/components/spinner"
@@ -34,9 +41,7 @@ import Link from "next/link"
 import { useEffect, useState, type FormEvent } from "react"
 import { toast } from "sonner"
 
-import {
-  FeatureRequestStatusBadge,
-} from "@/lib/feature-request-status"
+import { FeatureRequestStatusBadge } from "@/lib/feature-request-status"
 import { useTRPC, useTRPCClient } from "@/trpc/client"
 
 function ListSkeleton() {
@@ -156,6 +161,184 @@ function CreateProjectDialog({
   )
 }
 
+function LinkRepositoryDialog({
+  open,
+  onOpenChange,
+  projects,
+  defaultProjectId,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  projects: { id: string; name: string }[]
+  defaultProjectId: string | null
+}) {
+  const trpc = useTRPC()
+  const trpcClient = useTRPCClient()
+  const queryClient = useQueryClient()
+  const [projectId, setProjectId] = useState<string>(defaultProjectId ?? "")
+
+  useEffect(() => {
+    if (defaultProjectId && !projectId) setProjectId(defaultProjectId)
+  }, [defaultProjectId, projectId])
+
+  const mutation = useMutation({
+    mutationFn: (input: {
+      projectId: string
+      installationId: string
+      githubRepositoryId: string
+      owner: string
+      name: string
+      defaultBranch: string
+    }) => trpcClient.repositories.link.mutate(input),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({
+        queryKey: trpc.repositories.listByProject.queryOptions({
+          projectId: vars.projectId,
+        }).queryKey,
+      })
+      toast.success("Repository linked")
+      onOpenChange(false)
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(`Could not link repository. ${err.message ?? "Try again."}`)
+    },
+  })
+
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const form = new FormData(e.currentTarget)
+    mutation.mutate({
+      projectId,
+      installationId: String(form.get("installationId")),
+      githubRepositoryId: String(form.get("githubRepositoryId")),
+      owner: String(form.get("owner")),
+      name: String(form.get("name")),
+      defaultBranch: String(form.get("defaultBranch") || "main"),
+    })
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!mutation.isPending) {
+          mutation.reset()
+          onOpenChange(o)
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Link a GitHub repository</DialogTitle>
+          <DialogDescription>
+            Connect a GitHub repo to a project. The installation ID and
+            repository ID can be found in any webhook delivery payload under{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              installation.id
+            </code>{" "}
+            and{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              repository.id
+            </code>
+            .
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="repo-project">Project</Label>
+              <Select value={projectId} onValueChange={setProjectId} required>
+                <SelectTrigger id="repo-project">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="installation-id">
+                  Installation ID <span aria-hidden>*</span>
+                </Label>
+                <Input
+                  id="installation-id"
+                  name="installationId"
+                  placeholder="e.g. 12345678"
+                  required
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="repo-id">
+                  Repository ID <span aria-hidden>*</span>
+                </Label>
+                <Input
+                  id="repo-id"
+                  name="githubRepositoryId"
+                  placeholder="e.g. 987654321"
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="repo-owner">
+                  Owner <span aria-hidden>*</span>
+                </Label>
+                <Input
+                  id="repo-owner"
+                  name="owner"
+                  placeholder="e.g. acme-org"
+                  required
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="repo-name">
+                  Repository name <span aria-hidden>*</span>
+                </Label>
+                <Input
+                  id="repo-name"
+                  name="name"
+                  placeholder="e.g. core-api"
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="default-branch">Default branch</Label>
+              <Input
+                id="default-branch"
+                name="defaultBranch"
+                placeholder="main"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending || !projectId}>
+              {mutation.isPending && (
+                <Spinner className="mr-2 size-4" aria-hidden />
+              )}
+              Link repository
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function SubmitFeatureRequestDialog({
   open,
   onOpenChange,
@@ -257,6 +440,7 @@ export function FeatureRequestsPanel() {
   )
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [createFROpen, setCreateFROpen] = useState(false)
+  const [linkRepoOpen, setLinkRepoOpen] = useState(false)
 
   const projectsQuery = useQuery(trpc.projects.list.queryOptions())
 
@@ -289,9 +473,17 @@ export function FeatureRequestsPanel() {
           </p>
         </div>
         {projects.length > 0 && (
-          <Button onClick={() => setCreateFROpen(true)}>
-            Submit feature request
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLinkRepoOpen(true)}
+            >
+              Link repository
+            </Button>
+            <Button onClick={() => setCreateFROpen(true)}>
+              Submit feature request
+            </Button>
+          </div>
         )}
       </div>
       <Separator className="my-4" />
@@ -389,6 +581,13 @@ export function FeatureRequestsPanel() {
           projectId={selectedProjectId}
         />
       )}
+
+      <LinkRepositoryDialog
+        open={linkRepoOpen}
+        onOpenChange={setLinkRepoOpen}
+        projects={projects}
+        defaultProjectId={selectedProjectId}
+      />
     </section>
   )
 }

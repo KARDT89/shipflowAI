@@ -1,92 +1,97 @@
-# ShipFlow AI Project Plan
+Ready for review
+Select text to add comments on the plan
+ShipFlow AI — Automatic GitHub App Installation Flow
+Context
+The current "Link Repository" dialog asks users to manually copy-paste numeric GitHub installation IDs and repository IDs from webhook delivery payloads — completely opaque and wrong. A customer should just click "Connect GitHub", pick their repos on GitHub's own UI, and come back to ShipFlow where repos are already discovered and ready to assign to projects.
 
-## Architecture
+This replaces the manual LinkRepositoryDialog with a proper GitHub App installation flow that:
 
-- Use a pnpm/Turborepo monorepo with `apps/web` as the only deployable application.
-- Use Next.js 16 App Router for UI and backend Route Handlers. Node.js 20.9+ is required. [Next.js 16 requirements](https://nextjs.org/docs/app/getting-started/installation)
-- Mount tRPC at `/api/trpc`, Better Auth at `/api/auth/*`, and GitHub, Polar, and Inngest handlers under `/api/*`.
-- Do not add Express initially. It duplicates Next.js backend capabilities and complicates Vercel deployment.
-- Keep business logic in workspace packages so an Express/Railway backend can be extracted later without rewriting routers or workflows.
-- Use generic PostgreSQL through a pooled `DATABASE_URL`; run migrations outside the Vercel request runtime.
+Sends the user to GitHub's app install page
+Receives the callback with installation_id
+Auto-discovers all repos for that installation via Octokit
+Shows a clean "assign repo → project" UI
+Calls the existing repositories.link mutation for each assignment
+How GitHub App Installations Work
+User clicks "Connect GitHub" → opens https://github.com/apps/{APP_SLUG}/installations/new
+User selects repos on GitHub's UI → clicks Install
+GitHub redirects to the App's Setup URL (configured in GitHub App settings) with: GET /github/callback?installation_id=12345678&setup_action=install
+ShipFlow callback page uses githubApp.getInstallationOctokit(installationId) → lists all repos
+User assigns repos to projects → calls existing repositories.link tRPC mutation
+Redirects to dashboard ✅
+What Needs to Be Set (One-Time GitHub App Config)
+In GitHub App settings → "Setup URL": set to
+https://matrix-nuptials-phonics.ngrok-free.dev/github/callback
 
-## Workspace Packages
+Also need GITHUB_APP_SLUG env var (the URL-friendly name from github.com/apps/YOUR_SLUG).
 
-- `apps/web`: Next.js application, pages, Route Handlers, providers, and layouts.
-- `packages/api`: tRPC routers, context, tenant middleware, authorization, and Zod inputs.
-- `packages/db`: Drizzle schema, PostgreSQL client, queries, and migrations.
-- `packages/auth`: Better Auth configuration and organization plugin.
-- `packages/ui`: shared Shadcn components and Tailwind styles.
-- `packages/github`: GitHub App installation clients, webhook validation, and PR diff access.
-- `packages/ai`: prompts, structured output schemas, model configuration, and AI calls.
-- `packages/inngest`: event definitions and durable workflow functions.
-- `packages/billing`: Polar client, plans, limits, and credit ledger.
-- `packages/config`: shared TypeScript and ESLint configuration.
+Files to Create / Modify
+1. packages/github/src/app.ts — add getInstallationRepos helper
+export async function getInstallationRepos(installationId: number) {
+  const octokit = await githubApp.getInstallationOctokit(installationId)
+  const response = await octokit.request("GET /installation/repositories", {
+    per_page: 100,
+  })
+  return response.data.repositories.map((r) => ({
+    id: String(r.id),
+    owner: r.owner.login,
+    name: r.name,
+    fullName: r.full_name,
+    defaultBranch: r.default_branch,
+  }))
+}
+Export from packages/github/src/index.ts.
 
-## Dependencies
+2. apps/web/app/github/callback/page.tsx — new server page (outside dashboard route group)
+Reads installation_id + setup_action from searchParams
+Auth check via auth.api.getSession → redirects to /login if not signed in
+Calls getInstallationRepos(Number(installation_id))
+Prefetches projects.list via server-side tRPC
+Passes repos + projects to <GitHubInstallCallbackClient>
+If no installation_id in params → redirect to /dashboard
+3. apps/web/components/github-install-callback.tsx — new "use client" component
+State:
 
-**Foundation**
+assignments: Record<repoId, projectId | "skip"> — one entry per discovered repo
+UI:
 
-- `next@16`, `react`, `react-dom`: web application and server runtime.
-- `turbo`, `typescript`, `pnpm`: monorepo build and package management.
-- `eslint`, `eslint-config-next`, `prettier`, `prettier-plugin-tailwindcss`: explicit linting and formatting; Next.js 16 no longer lints during builds.
-- `zod`: validation shared by tRPC, environment configuration, and AI outputs.
+One row per repo: repo name + project <Select> (options: user's projects + "Skip")
+Submit button: "Link selected repositories" → for each repo with a project assigned, calls repositories.link mutation
+On all mutations complete → router.push("/dashboard") + toast.success
+Reuses:
 
-**API and client state**
+useTRPCClient() from @/trpc/client
+repositories.link mutation (already exists in packages/api/src/routers/repositories.ts)
+4. apps/web/components/feature-requests-panel.tsx — replace manual dialog
+Remove LinkRepositoryDialog component entirely
+Remove "Link repository" button
+Add "Connect GitHub" button (when projects exist) that opens: https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new as a regular <a href> with target="_blank" — GitHub's own UI handles the install
+5. .env.local — add two new vars
+GITHUB_APP_SLUG=your-app-slug-here
+NEXT_PUBLIC_GITHUB_APP_SLUG=your-app-slug-here
+(NEXT_PUBLIC_ needed because the dashboard button is a client component)
 
-- `@trpc/server`, `@trpc/client`: end-to-end typed API.
-- `@trpc/tanstack-react-query`, `@tanstack/react-query`: recommended tRPC v11 client integration, caching, mutations, and invalidation. [tRPC setup](https://trpc.io/docs/client/tanstack-react-query/setup)
-- `superjson`: preserve dates and other non-JSON-native values across tRPC.
+6. apps/web/app/api/webhooks/github/route.ts — add installation event handlers
+webhooks.on("installation.deleted", async ({ payload }) => {
+  // When user uninstalls the app, remove their repos from our DB
+  // (requires adding a deleteRepositoriesByInstallationId query)
+})
+And handle installation.repositories_removed to clean up delinked repos.
 
-**Database and authentication**
+Add deleteRepositoriesByInstallationId(installationId: string) to:
 
-- `drizzle-orm`, `postgres`: PostgreSQL access.
-- `drizzle-kit`: development dependency for migration generation and execution.
-- `better-auth`: email/password authentication, GitHub OAuth, sessions, and organization membership.
-- Use Better Auth’s built-in Drizzle adapter and organization plugin; no separate auth service is needed. [Better Auth installation](https://better-auth.com/docs/installation)
-
-**UI**
-
-- `tailwindcss`, `@tailwindcss/postcss`: Tailwind CSS v4.
-- Shadcn CLI-managed dependencies: `radix-ui`, `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, and `tw-animate-css`.
-- `sonner`: notifications.
-- `react-hook-form`, `@hookform/resolvers`: validated forms.
-- `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`: task ordering and Kanban interactions.
-- Configure Shadcn’s monorepo support so generated primitives live in `packages/ui`. [Shadcn monorepo guide](https://ui.shadcn.com/docs/monorepo)
-
-**Product integrations**
-
-- `@octokit/app`, `@octokit/webhooks`: GitHub App installation clients, API access, and signature-verified webhooks.
-- `inngest`: asynchronous clarification, generation, review, and release workflows. Its Next.js adapter exposes `/api/inngest`. [Inngest handler](https://www.inngest.com/docs/reference/serve)
-- `ai`, `@openrouter/ai-sdk-provider`: provider-neutral AI calls through the existing OpenRouter key.
-- Use AI SDK v6 `generateText` with `Output.object({ schema })`; this replaces the PRD’s older `generateObject` API while retaining Zod-validated structured output. [AI SDK structured output](https://ai-sdk.dev/docs/ai-sdk-core/generating-structured-data)
-- Default `AI_MODEL` to `openai/gpt-4.1-nano` for inexpensive testing, while allowing any OpenRouter model without code changes. [OpenRouter provider](https://ai-sdk.dev/providers/community-providers/openrouter)
-- `@polar-sh/sdk`: checkout, subscription API, and verified billing webhooks. [Polar SDK](https://docs.polar.sh/documentation/sdks/typescript-sdk)
-
-**Testing**
-
-- `vitest`, `@vitest/coverage-v8`: unit and integration tests.
-- `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom`: UI tests.
-- `msw`: test-only API and webhook fixtures; production will have no synthetic PR path.
-- `@playwright/test`: authentication and lifecycle browser tests.
-
-## Build Order
-
-1. Scaffold the monorepo, Next.js 16, shared configuration, Shadcn UI package, linting, tests, and environment validation.
-2. Build Drizzle schemas and migrations, then Better Auth with email/password, GitHub OAuth, organizations, active organization sessions, and protected dashboard access.
-3. Add tRPC context derived from the Better Auth session, tenant-protected procedures, React Query hydration, and an authenticated health procedure.
-4. Implement projects, repositories, feature requests, PRDs, tasks, and lifecycle audit events.
-5. Add the real GitHub App installation and webhook flow before any AI review logic.
-6. Add Inngest workflows, then OpenRouter-backed structured AI workflows one at a time.
-7. Build feature-request lifecycle screens, task board, review history, and approval flow.
-8. Add Polar plans and credit enforcement after the review workflow functions correctly.
-9. Verify builds and deploy `apps/web` to Vercel; move only Inngest execution to Railway if Vercel duration limits become a demonstrated blocker.
-
-## Acceptance and Assumptions
-
-- First milestone: sign up, sign in, create/select an organization, and open a protected dashboard backed by PostgreSQL and tRPC.
-- Unit tests cover schemas, tenant enforcement, state transitions, credit enforcement, and AI output parsing.
-- Integration tests cover signed webhooks, event persistence, Inngest emission, and blocking review behavior.
-- Playwright covers the primary request-to-approval workflow.
-- Package versions will be pinned through `pnpm-lock.yaml`, with Next.js fixed to major version 16 and mutually compatible current releases selected during scaffolding.
-- Email/password is the sandbox fallback; no production email package is installed initially.
-- The filesystem currently contains only the PRD, despite additional files shown in the IDE tabs.
+packages/db/src/queries/repositories.ts
+packages/db/src/index.ts (export)
+Verification
+Set GITHUB_APP_SLUG in .env.local and set the Setup URL in GitHub App settings to the ngrok callback
+pnpm dev — open localhost:3000/dashboard
+Click "Connect GitHub" → GitHub install page opens
+Select a repo → Install → GitHub redirects to /github/callback?installation_id=xxx
+Callback page shows the repo auto-discovered — select a project → Link
+Dashboard shows the repo linked
+Open a PR on that repo → check pull_requests table gets a row
+Bad path: visiting /github/callback with no session → redirects to /login
+Bad path: installation_id not found by Octokit → shows error state, link back to dashboard
+What is NOT changing
+repositories.link tRPC procedure — already correct, no changes needed
+createRepository DB query — already correct
+Webhook pull_request handlers — unchanged

@@ -1,6 +1,8 @@
 # ShipFlow AI — Delta Tracker
 
-Last updated: 2026-06-23 (session 3)
+Last updated: 2026-06-23 (session 4)
+
+For ui related context refer to : docs/ui-spec.md
 
 ---
 
@@ -26,10 +28,37 @@ Last updated: 2026-06-23 (session 3)
 | 11 tests | API middleware (4) + OrganizationPanel (6) + tRPC smoke (1) | `packages/api/src/routers/health.test.ts`, `apps/web/components/dashboard-actions.test.tsx`, `apps/web/trpc/trpc-smoke.test.tsx` |
 | PRD + Tasks data layer | DB queries + tRPC routers; FR detail PRD and Tasks tabs live | `packages/db/src/queries/prds.ts`, `packages/db/src/queries/tasks.ts`, `packages/api/src/routers/prds.ts`, `packages/api/src/routers/tasks.ts` |
 | **GitHub App + webhooks** | `@shipflow/github` package; HMAC-verified POST handler; `pull_request` events → `pullRequests` table | `packages/github/src/`, `apps/web/app/api/webhooks/github/route.ts`, `packages/db/src/queries/repositories.ts`, `packages/db/src/queries/pullRequests.ts` |
+| **Repo → project linking** | `repositories.link` + `repositories.listByProject` tRPC router; `createRepository` + `listRepositoriesByProject` DB queries; "Link repository" dialog on dashboard | `packages/api/src/routers/repositories.ts`, `packages/db/src/queries/repositories.ts`, `apps/web/components/feature-requests-panel.tsx` |
 
 ---
 
-## What was built this session (2026-06-23 — GitHub App + webhooks)
+## What was built this session (2026-06-23 — Repo → project linking, session 4)
+
+### Repositories tRPC router (`packages/api/src/routers/repositories.ts`)
+- `repositories.link` — `tenantProcedure`; validates `projectId` belongs to active org via `listProjectsByOrg`; inserts into `repositories` table; returns the created row
+- `repositories.listByProject` — `tenantProcedure`; same org ownership guard; returns all repos for a project
+
+### DB queries (extended `packages/db/src/queries/repositories.ts`)
+- `createRepository(data)` — insert and return; accepts `projectId`, `githubInstallationId`, `githubRepositoryId`, `owner`, `name`, `defaultBranch`
+- `listRepositoriesByProject(projectId)` — simple select
+
+### Link Repository UI (`apps/web/components/feature-requests-panel.tsx`)
+- `LinkRepositoryDialog` — Dialog with project selector (Select), installation ID, repository ID, owner, repo name, and optional default branch fields
+- "Link repository" outline button added next to "Submit feature request" in the panel header (only visible when projects exist)
+- On success: invalidates `repositories.listByProject` query key and shows toast
+
+### PRD alignment update
+- `CLAUDE.md` — added alignment snapshot table, marked 4b in progress → done, added missing tRPC routers/pages to gap table
+- `docs/PLAN.md` — added Current Status table showing step completion
+
+### Verified working (typecheck)
+- `pnpm --filter @shipflow/api typecheck` ✅
+- `pnpm --filter web typecheck` ✅
+- PR webhooks will now write to `pullRequests` once a `repositories` row is inserted via the UI
+
+---
+
+## What was built previously (2026-06-23 — GitHub App + webhooks)
 
 ### GitHub package (`packages/github/`)
 
@@ -98,11 +127,27 @@ Event handlers registered at module level:
 
 ---
 
+## PRD Alignment Snapshot
+
+| PRD Step | Description | Status |
+|---|---|---|
+| 1 | Monorepo scaffold + auth end-to-end | ✅ Done |
+| 2 | GitHub App registration + webhook receiver | ✅ Done |
+| 3 | Inngest wiring with stub AI calls | ❌ Not started |
+| 4 | Real AI calls (clarification → PRD → review) | ❌ Not started |
+| 5 | UI: clarification → PRD → tasks → review tabs | ⚠️ Partial |
+| 6 | Billing (Polar) | ❌ Not started |
+| 7 | Polish + deploy + demo | ❌ Not started |
+
+**Overall: ~35–40% of PRD surface implemented.**
+
+---
+
 ## Missing / Not Started ❌
 
 | Area | Gap | Depends on |
 |------|-----|------------|
-| **Repo → project linking** | `repositories` table is empty; no UI or tRPC router to link a GitHub repo to a project | GitHub App installed on repo |
+| **Repo → project linking** | ✅ Done (session 4) | — |
 | **Inngest package** | `packages/inngest/` is empty — no event definitions, no workflow functions | Repo linked to project (so PR webhooks persist) |
 | **AI package** | `packages/ai/` is empty — no prompts, no Zod schemas, no structured output calls | Inngest wired |
 | **GitHub diff fetcher** | `packages/github/` has no Octokit installation client, no diff fetcher, no PR comment poster | Inngest workflow triggering it |
@@ -111,6 +156,8 @@ Event handlers registered at module level:
 | **FR detail tabs 4–5** | Review History / Audit Log are `<ComingSoon />` stubs | `lifecycleEvents` rows (written by AI workflows) |
 | **Billing** | `packages/billing/` is empty — no Polar client, no credit enforcement | Inngest wired |
 | **Release approval UI** | No approval action bar, no readiness check | Review workflow complete |
+| **Missing tRPC routers** | `repositories.*`, `prd.approve/requestRevision`, `review.*`, `approval.*`, `billing.*` | Various |
+| **Missing pages** | `/workspace/settings`, `/projects/[id]/repositories`, `/billing` | Various |
 
 ---
 
