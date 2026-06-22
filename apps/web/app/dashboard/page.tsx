@@ -1,4 +1,5 @@
 import { auth } from "@shipflow/auth"
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 import { Badge } from "@workspace/ui/components/badge"
 import {
   Card,
@@ -10,7 +11,12 @@ import {
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
-import { OrganizationForm, SignOutButton } from "@/components/dashboard-actions"
+import {
+  OrganizationPanel,
+  SignOutButton,
+} from "@/components/dashboard-actions"
+import { TenantHealthCard } from "@/components/tenant-health-card"
+import { getQueryClient, trpc } from "@/trpc/server"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +25,12 @@ export default async function DashboardPage() {
 
   if (!session) {
     redirect("/login")
+  }
+
+  const queryClient = getQueryClient()
+
+  if (session.session.activeOrganizationId) {
+    await queryClient.prefetchQuery(trpc.health.authenticated.queryOptions())
   }
 
   return (
@@ -53,29 +65,24 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {session.session.activeOrganizationId ? (
-              <p className="text-sm text-muted-foreground">
-                Active organization: {session.session.activeOrganizationId}
-              </p>
-            ) : (
-              <OrganizationForm />
-            )}
+            <OrganizationPanel />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Feature requests</CardTitle>
-            <CardDescription>
-              Your delivery lifecycle will appear here.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No feature requests yet.
-            </p>
-          </CardContent>
-        </Card>
+        {session.session.activeOrganizationId ? (
+          <HydrationBoundary state={dehydrate(queryClient)}>
+            <TenantHealthCard />
+          </HydrationBoundary>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Tenant API</CardTitle>
+              <CardDescription>
+                Select or create an organization to enable tenant access.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
       </section>
     </main>
   )

@@ -1,11 +1,30 @@
 {
   "name": "@shipflow/api",
   "version": "0.0.0",
+  "type": "module",
   "private": true,
   "scripts": {
-    "dev": "echo 'Add dev script here'",
-    "build": "echo 'Add build script here'",
-    "test": "echo 'Add test script here'",
-    "lint": "echo 'Add lint script here'"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./context": "./src/context.ts"
+  },
+  "dependencies": {
+    "@shipflow/auth": "workspace:*",
+    "@shipflow/db": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "superjson": "^2.2.6",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "9.39.4",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.9"
   }
 }
