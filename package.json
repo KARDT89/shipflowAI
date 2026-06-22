@@ -1,0 +1,32 @@
+{
+  "name": "shipflow-ai",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "auth:generate": "dotenv -e .env -- pnpm --filter @shipflow/auth auth:generate",
+    "build": "dotenv -e .env -- turbo build",
+    "db:down": "docker compose down",
+    "db:generate": "dotenv -e .env -- pnpm --filter @shipflow/db db:generate",
+    "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @shipflow/db db:migrate",
+    "db:studio": "dotenv -e .env -- pnpm --filter @shipflow/db db:studio",
+    "db:up": "docker compose up -d --wait postgres",
+    "dev": "dotenv -e .env -- turbo dev",
+    "lint": "turbo lint",
+    "format": "turbo format",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "dotenv-cli": "^11.0.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "turbo": "^2.9.15",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

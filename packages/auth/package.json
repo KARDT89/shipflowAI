@@ -1,0 +1,28 @@
+{
+  "name": "@shipflow/auth",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "auth:generate": "better-auth generate --config ./src/index.ts --output ../db/src/schema/auth.ts --yes",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.20",
+    "@shipflow/db": "workspace:*",
+    "better-auth": "^1.6.20"
+  },
+  "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
+    "@types/node": "^20.19.43",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3"
+  }
+}
