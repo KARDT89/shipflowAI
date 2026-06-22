@@ -1,6 +1,7 @@
 import {
   createFeatureRequest,
   getFeatureRequestById,
+  getFeatureRequestForOrg,
   listFeatureRequestsByProject,
   updateFeatureRequestStatus,
 } from "@shipflow/db"
@@ -38,6 +39,17 @@ export const featureRequestsRouter = createTRPCRouter({
     .input(z.object({ id: z.string().uuid(), projectId: z.string().uuid() }))
     .query(async ({ input }) => {
       const fr = await getFeatureRequestById(input.id, input.projectId)
+      if (!fr) throw new TRPCError({ code: "NOT_FOUND" })
+      return fr
+    }),
+
+  getById: tenantProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input, ctx }) => {
+      const fr = await getFeatureRequestForOrg(
+        input.id,
+        ctx.activeOrganizationId
+      )
       if (!fr) throw new TRPCError({ code: "NOT_FOUND" })
       return fr
     }),

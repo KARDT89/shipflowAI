@@ -3,6 +3,7 @@ export { findMembership } from "./queries/membership"
 export {
   listFeatureRequestsByProject,
   getFeatureRequestById,
+  getFeatureRequestForOrg,
   createFeatureRequest,
   updateFeatureRequestStatus,
 } from "./queries/featureRequests"

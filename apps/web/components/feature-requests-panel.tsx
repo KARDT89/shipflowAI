@@ -1,7 +1,6 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
   Card,
@@ -31,39 +30,14 @@ import { Separator } from "@workspace/ui/components/separator"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { Spinner } from "@workspace/ui/components/spinner"
 import { Textarea } from "@workspace/ui/components/textarea"
+import Link from "next/link"
 import { useEffect, useState, type FormEvent } from "react"
 import { toast } from "sonner"
 
+import {
+  FeatureRequestStatusBadge,
+} from "@/lib/feature-request-status"
 import { useTRPC, useTRPCClient } from "@/trpc/client"
-
-const STATUS_CONFIG: Record<
-  string,
-  { variant: "default" | "secondary" | "destructive" | "outline"; label: string }
-> = {
-  draft: { variant: "outline", label: "Draft" },
-  clarifying: { variant: "secondary", label: "Clarifying" },
-  prd_generated: { variant: "secondary", label: "PRD generated" },
-  prd_approved: { variant: "secondary", label: "PRD approved" },
-  tasks_generated: { variant: "secondary", label: "Tasks generated" },
-  tasks_approved: { variant: "secondary", label: "Tasks approved" },
-  in_development: { variant: "default", label: "In development" },
-  ai_review_running: { variant: "default", label: "Review running…" },
-  review_failed: { variant: "destructive", label: "Review failed" },
-  fix_needed: { variant: "destructive", label: "Fix needed" },
-  review_passed: { variant: "secondary", label: "Review passed" },
-  pending_human_approval: { variant: "secondary", label: "Pending approval" },
-  approved: { variant: "secondary", label: "Approved" },
-  shipped: { variant: "default", label: "Shipped" },
-  rejected: { variant: "destructive", label: "Rejected" },
-}
-
-function FeatureRequestStatusBadge({ status }: { status: string }) {
-  const { variant, label } = STATUS_CONFIG[status] ?? {
-    variant: "outline" as const,
-    label: status,
-  }
-  return <Badge variant={variant}>{label}</Badge>
-}
 
 function ListSkeleton() {
   return (
@@ -374,22 +348,28 @@ export function FeatureRequestsPanel() {
           ) : (
             <div className="grid gap-3">
               {featureRequestsQuery.data?.map((fr) => (
-                <Card key={fr.id}>
-                  <CardHeader>
-                    <CardTitle className="line-clamp-2 text-sm">
-                      {fr.rawInput}
-                    </CardTitle>
-                    <CardAction>
-                      <FeatureRequestStatusBadge status={fr.status} />
-                    </CardAction>
-                    <CardDescription>
-                      {selectedProject?.name} ·{" "}
-                      {new Intl.DateTimeFormat("en", {
-                        dateStyle: "medium",
-                      }).format(new Date(fr.createdAt))}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
+                <Link
+                  key={fr.id}
+                  href={`/dashboard/feature-requests/${fr.id}`}
+                  className="block"
+                >
+                  <Card className="transition-colors hover:bg-muted/50">
+                    <CardHeader>
+                      <CardTitle className="line-clamp-2 text-sm">
+                        {fr.rawInput}
+                      </CardTitle>
+                      <CardAction>
+                        <FeatureRequestStatusBadge status={fr.status} />
+                      </CardAction>
+                      <CardDescription>
+                        {selectedProject?.name} ·{" "}
+                        {new Intl.DateTimeFormat("en", {
+                          dateStyle: "medium",
+                        }).format(new Date(fr.createdAt))}
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}

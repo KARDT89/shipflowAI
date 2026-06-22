@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm"
 
 import { db } from "../client"
-import { featureRequests } from "../schema/domain"
+import { featureRequests, projects, workspaces } from "../schema/domain"
 import type { featureRequestStatus } from "../schema/domain"
 
 type FeatureRequestStatus = (typeof featureRequestStatus.enumValues)[number]
@@ -27,6 +27,25 @@ export async function getFeatureRequestById(id: string, projectId: string) {
       eq(featureRequests.projectId, projectId)
     ),
   })
+}
+
+export async function getFeatureRequestForOrg(
+  id: string,
+  organizationId: string
+) {
+  const [row] = await db
+    .select({ featureRequest: featureRequests })
+    .from(featureRequests)
+    .innerJoin(projects, eq(featureRequests.projectId, projects.id))
+    .innerJoin(workspaces, eq(projects.workspaceId, workspaces.id))
+    .where(
+      and(
+        eq(featureRequests.id, id),
+        eq(workspaces.organizationId, organizationId)
+      )
+    )
+    .limit(1)
+  return row?.featureRequest ?? null
 }
 
 export async function createFeatureRequest({
