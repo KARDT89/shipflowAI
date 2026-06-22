@@ -16,4 +16,9 @@ export {
   listTasksByFeatureRequestId,
   updateTaskStatus,
 } from "./queries/tasks"
+export { findRepositoryByGithubId } from "./queries/repositories"
+export {
+  upsertPullRequest,
+  updatePullRequestStatus,
+} from "./queries/pullRequests"
 export * from "./schema/index"

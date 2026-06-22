@@ -15,6 +15,8 @@
   "dependencies": {
     "@shipflow/api": "workspace:*",
     "@shipflow/auth": "workspace:*",
+    "@shipflow/db": "workspace:*",
+    "@shipflow/github": "workspace:*",
     "@tanstack/react-query": "^5.101.0",
     "@trpc/client": "^11.18.0",
     "@trpc/server": "^11.18.0",
