@@ -63,3 +63,19 @@ export async function getPrdForFeatureRequest(
     .limit(1)
   return row?.prd ?? null
 }
+
+export async function approveLatestPrdForFeatureRequest(
+  featureRequestId: string,
+  organizationId: string
+) {
+  const prd = await getPrdForFeatureRequest(featureRequestId, organizationId)
+  if (!prd || prd.status !== "draft") return null
+
+  const [row] = await db
+    .update(prds)
+    .set({ status: "approved" })
+    .where(eq(prds.id, prd.id))
+    .returning()
+
+  return row ?? null
+}

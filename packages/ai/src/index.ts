@@ -1,6 +1,7 @@
 export { DEFAULT_AI_MODEL, getAiModel } from "./client"
 export { generateClarification } from "./generateClarification"
 export { generatePrd } from "./generatePrd"
+export { generateTasks } from "./generateTasks"
 export {
   getAiErrorDiagnosticMessage,
   logAiError,

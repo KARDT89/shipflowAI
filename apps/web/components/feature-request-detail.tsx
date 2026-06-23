@@ -168,9 +168,33 @@ function ClarificationAnswers({ featureRequestId }: { featureRequestId: string }
 
 function PrdTab({ featureRequestId }: { featureRequestId: string }) {
   const trpc = useTRPC()
-  const { data: prd, isPending } = useQuery(
-    trpc.prds.getByFeatureRequestId.queryOptions({ featureRequestId })
-  )
+  const trpcClient = useTRPCClient()
+  const queryClient = useQueryClient()
+
+  const prdQuery = trpc.prds.getByFeatureRequestId.queryOptions({
+    featureRequestId,
+  })
+  const featureRequestQuery = trpc.featureRequests.getById.queryOptions({
+    id: featureRequestId,
+  })
+  const tasksQuery = trpc.tasks.listByFeatureRequest.queryOptions({
+    featureRequestId,
+  })
+
+  const { data: prd, isPending } = useQuery(prdQuery)
+
+  const approveMutation = useMutation({
+    mutationFn: () => trpcClient.prds.approve.mutate({ featureRequestId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: prdQuery.queryKey })
+      queryClient.invalidateQueries({ queryKey: featureRequestQuery.queryKey })
+      queryClient.invalidateQueries({ queryKey: tasksQuery.queryKey })
+      toast.success("PRD approved. Task generation is running.")
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(`Could not approve PRD. ${err.message ?? "Try again."}`)
+    },
+  })
 
   if (isPending) return <Skeleton className="h-48 w-full" />
 
@@ -196,9 +220,20 @@ function PrdTab({ featureRequestId }: { featureRequestId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Badge variant="secondary">{PRD_STATUS_LABEL[prd.status] ?? prd.status}</Badge>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">
+          {PRD_STATUS_LABEL[prd.status] ?? prd.status}
+        </Badge>
         <span className="text-xs text-muted-foreground">v{prd.version}</span>
+        {prd.status === "draft" && (
+          <Button
+            className="ml-auto"
+            disabled={approveMutation.isPending}
+            onClick={() => approveMutation.mutate()}
+          >
+            {approveMutation.isPending ? "Approving..." : "Approve PRD"}
+          </Button>
+        )}
       </div>
       {sections.map(({ label, value }) => {
         if (Array.isArray(value) && value.length === 0) return null

@@ -11,13 +11,21 @@ export {
   listProjectsByOrg,
   createWorkspaceWithProject,
 } from "./queries/projects"
-export { createPrd, getPrdForFeatureRequest } from "./queries/prds"
+export {
+  approveLatestPrdForFeatureRequest,
+  createPrd,
+  getPrdForFeatureRequest,
+} from "./queries/prds"
 export {
   createClarificationQuestions,
   listClarificationThreadsByFeatureRequestId,
   updateClarificationAnswers,
 } from "./queries/clarificationThreads"
-export { listTasksByFeatureRequestId, updateTaskStatus } from "./queries/tasks"
+export {
+  createTasksForPrd,
+  listTasksByFeatureRequestId,
+  updateTaskStatus,
+} from "./queries/tasks"
 export {
   findGithubInstallation,
   listGithubInstallationsByOrganization,

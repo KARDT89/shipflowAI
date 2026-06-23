@@ -11,6 +11,13 @@ export type Events = {
       organizationId: string
     }
   }
+  "prd.approved": {
+    data: {
+      featureRequestId: string
+      organizationId: string
+      prdId: string
+    }
+  }
   "github/pull_request.opened": {
     data: {
       pullRequestId: string
