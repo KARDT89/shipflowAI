@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "@workspace/ui/components/badge"
+import { Button } from "@workspace/ui/components/button"
 import {
   Card,
   CardContent,
@@ -23,6 +24,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
+import { Textarea } from "@workspace/ui/components/textarea"
+import { useState } from "react"
 import { toast } from "sonner"
 
 import {
@@ -61,6 +64,105 @@ function ComingSoon() {
     <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
       Coming soon
     </div>
+  )
+}
+
+function ClarificationAnswers({ featureRequestId }: { featureRequestId: string }) {
+  const trpc = useTRPC()
+  const trpcClient = useTRPCClient()
+  const queryClient = useQueryClient()
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+
+  const clarificationsQuery = trpc.featureRequests.listClarifications.queryOptions({
+    featureRequestId,
+  })
+  const featureRequestQuery = trpc.featureRequests.getById.queryOptions({
+    id: featureRequestId,
+  })
+  const prdQuery = trpc.prds.getByFeatureRequestId.queryOptions({
+    featureRequestId,
+  })
+
+  const { data: clarifications, isPending } = useQuery(clarificationsQuery)
+
+  const answerMutation = useMutation({
+    mutationFn: () =>
+      trpcClient.featureRequests.answerClarification.mutate({
+        featureRequestId,
+        answers:
+          clarifications?.map((thread) => ({
+            clarificationThreadId: thread.id,
+            answer: (answers[thread.id] ?? thread.answer ?? "").trim(),
+          })) ?? [],
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: clarificationsQuery.queryKey })
+      queryClient.invalidateQueries({ queryKey: featureRequestQuery.queryKey })
+      queryClient.invalidateQueries({ queryKey: prdQuery.queryKey })
+      toast.success("Answers submitted. PRD generation is running.")
+    },
+    onError: (err: { message?: string }) => {
+      toast.error(`Could not submit answers. ${err.message ?? "Try again."}`)
+    },
+  })
+
+  if (isPending) return <Skeleton className="h-40 w-full" />
+
+  if (!clarifications || clarifications.length === 0) return null
+
+  const hasMissingAnswer = clarifications.some(
+    (thread) => (answers[thread.id] ?? thread.answer ?? "").trim().length === 0
+  )
+  const allAnswered = clarifications.every(
+    (thread) => thread.answer && thread.answer.trim().length > 0
+  )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          Clarification Questions
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {clarifications.map((thread, index) => (
+          <div key={thread.id} className="flex flex-col gap-2">
+            <p className="text-sm font-medium">
+              {index + 1}. {thread.question}
+            </p>
+            <Textarea
+              value={answers[thread.id] ?? thread.answer ?? ""}
+              disabled={Boolean(thread.answer) || answerMutation.isPending}
+              onChange={(event) =>
+                setAnswers((current) => ({
+                  ...current,
+                  [thread.id]: event.target.value,
+                }))
+              }
+              placeholder="Answer this clarification"
+            />
+          </div>
+        ))}
+
+        <div className="flex items-center gap-3">
+          <Button
+            disabled={hasMissingAnswer || answerMutation.isPending}
+            onClick={() => answerMutation.mutate()}
+          >
+            {answerMutation.isPending
+              ? "Submitting..."
+              : allAnswered
+                ? "Generate PRD"
+                : "Submit answers"}
+          </Button>
+          {allAnswered && (
+            <p className="text-xs text-muted-foreground">
+              Answers submitted. PRD generation should start shortly.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -286,6 +388,10 @@ export function FeatureRequestDetail({ id }: { id: string }) {
               <p className="whitespace-pre-wrap text-sm">{fr.rawInput}</p>
             </CardContent>
           </Card>
+
+          {fr.status === "clarifying" && (
+            <ClarificationAnswers featureRequestId={id} />
+          )}
 
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium">Update status</p>

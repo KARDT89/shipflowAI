@@ -50,3 +50,34 @@ export async function listClarificationThreadsByFeatureRequestId(
     .orderBy(asc(clarificationThreads.createdAt))
     .then((rows) => rows.map((row) => row.clarificationThread))
 }
+
+export async function updateClarificationAnswers({
+  featureRequestId,
+  answers,
+}: {
+  featureRequestId: string
+  answers: Array<{ id: string; answer: string }>
+}) {
+  if (answers.length === 0) return []
+
+  return db.transaction(async (tx) => {
+    const updated = []
+
+    for (const { id, answer } of answers) {
+      const [row] = await tx
+        .update(clarificationThreads)
+        .set({ answer })
+        .where(
+          and(
+            eq(clarificationThreads.id, id),
+            eq(clarificationThreads.featureRequestId, featureRequestId)
+          )
+        )
+        .returning()
+
+      if (row) updated.push(row)
+    }
+
+    return updated
+  })
+}

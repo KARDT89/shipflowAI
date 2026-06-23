@@ -1,6 +1,6 @@
 # ShipFlow AI — Delta Tracker
 
-Last updated: 2026-06-23 (session 3)
+Last updated: 2026-06-23 (session 6)
 
 ---
 
@@ -9,225 +9,135 @@ Last updated: 2026-06-23 (session 3)
 | Area | What exists | File(s) |
 |------|------------|---------|
 | Monorepo scaffold | pnpm workspaces, Turborepo, shared TS/ESLint configs | `turbo.json`, `pnpm-workspace.yaml`, `packages/typescript-config/`, `packages/eslint-config/` |
-| Database schema | All 13 domain tables + 7 auth tables, FK cascades, indexes, enums, Drizzle relations | `packages/db/src/schema/domain.ts`, `packages/db/src/schema/auth.ts` |
-| Auth | Better Auth — email/password, organization plugin, session management | `packages/auth/src/` |
-| tRPC middleware | 3 procedure tiers: public / protected / tenantProcedure (session + org + membership) | `packages/api/src/trpc.ts`, `packages/api/src/context.ts` |
-| Auth UI | Login, signup, org selector, sign-out | `apps/web/app/(auth)/`, `apps/web/components/login-form.tsx`, `apps/web/components/signup-form.tsx` |
-| DB query layer | `findMembership` + full feature request CRUD + project/workspace creation queries | `packages/db/src/queries/` |
-| Feature request API | tRPC router: `list`, `get`, `getById`, `create`, `updateStatus` — all behind `tenantProcedure` | `packages/api/src/routers/featureRequests.ts` |
-| Project/workspace API | tRPC router: `projects.list`, `projects.createWithWorkspace` (transactional) | `packages/api/src/routers/projects.ts` |
-| App shell / sidebar | `AppSidebar` with logo, org switcher, nav, user menu + sign-out | `apps/web/components/app-sidebar.tsx`, `apps/web/app/dashboard/layout.tsx` |
-| Dashboard UI | Page header + 4 metric tiles + `FeatureRequestsPanel` (clickable cards → detail page) | `apps/web/app/dashboard/page.tsx`, `apps/web/components/feature-requests-panel.tsx` |
-| Feature request detail | `/dashboard/feature-requests/[id]` — 5-tab shell (Overview + PRD + Tasks live; Reviews/Audit stubbed) | `apps/web/app/dashboard/feature-requests/[id]/page.tsx`, `apps/web/components/feature-request-detail.tsx` |
-| Shared status lib | `STATUS_CONFIG` + `FeatureRequestStatusBadge` | `apps/web/lib/feature-request-status.tsx` |
-| Landing page | 5-section landing: nav, hero, lifecycle pipeline, feature cards, CTA + footer | `apps/web/app/page.tsx` |
-| Shadcn preset | style `radix-mira`, icon library `remixicon` | `packages/ui/src/styles/globals.css`, `packages/ui/components.json` |
-| Vitest setup | Test runner configured and passing | `apps/web/vitest.config.ts`, `apps/web/vitest.setup.ts` |
-| 11 tests | API middleware (4) + OrganizationPanel (6) + tRPC smoke (1) | `packages/api/src/routers/health.test.ts`, `apps/web/components/dashboard-actions.test.tsx`, `apps/web/trpc/trpc-smoke.test.tsx` |
-| PRD + Tasks data layer | DB queries + tRPC routers; FR detail PRD and Tasks tabs live | `packages/db/src/queries/prds.ts`, `packages/db/src/queries/tasks.ts`, `packages/api/src/routers/prds.ts`, `packages/api/src/routers/tasks.ts` |
-| **GitHub App + webhooks** | `@shipflow/github` package; HMAC-verified POST handler; `pull_request` events → `pullRequests` table | `packages/github/src/`, `apps/web/app/api/webhooks/github/route.ts`, `packages/db/src/queries/repositories.ts`, `packages/db/src/queries/pullRequests.ts` |
+| Database schema | Domain/auth tables, FK cascades, indexes, enums, Drizzle relations | `packages/db/src/schema/` |
+| Auth | Better Auth email/password, GitHub OAuth linking, organization plugin, sessions | `packages/auth/src/`, `apps/web/app/(auth)/` |
+| tRPC middleware | public/protected/tenant procedures with session + active org checks | `packages/api/src/trpc.ts`, `packages/api/src/context.ts` |
+| App shell + dashboard | Sidebar, org switcher, dashboard metrics, feature request panel | `apps/web/app/dashboard/`, `apps/web/components/` |
+| Feature request CRUD | List/get/create/update status behind tenant procedures | `packages/api/src/routers/featureRequests.ts`, `packages/db/src/queries/featureRequests.ts` |
+| Feature request detail | Overview + PRD + Tasks tabs live; Reviews/Audit still stubbed | `apps/web/components/feature-request-detail.tsx` |
+| PRD + tasks data layer | Latest PRD fetch, task listing, task status update | `packages/db/src/queries/prds.ts`, `packages/db/src/queries/tasks.ts`, `packages/api/src/routers/prds.ts`, `packages/api/src/routers/tasks.ts` |
+| GitHub App install flow | OAuth link, app install/setup, installation repo listing, repo assignment to projects | `apps/web/app/github/`, `apps/web/components/github-install-callback.tsx`, `packages/github/src/` |
+| Repo → project linking | `repositories.link`, `repositories.listByProject`, repo insert/list queries | `packages/api/src/routers/repositories.ts`, `packages/db/src/queries/repositories.ts` |
+| GitHub webhooks | HMAC-verified `POST /api/webhooks/github`; PR events persist `pullRequests`; PR events emit Inngest | `apps/web/app/api/webhooks/github/route.ts` |
+| Inngest foundation | Inngest client, typed events, Next route, PR-opened lifecycle stub | `packages/inngest/src/`, `apps/web/app/api/inngest/route.ts` |
+| AI package foundation | OpenRouter client, strict Zod schemas, prompts, provider diagnostics | `packages/ai/src/` |
+| Clarification loop | Feature request create emits `feature_request.created`; Inngest runs AI clarification, writes questions, sets `clarifying`, writes lifecycle event | `packages/api/src/routers/featureRequests.ts`, `packages/inngest/src/functions/clarifyRequest.ts`, `packages/db/src/queries/clarificationThreads.ts` |
 
 ---
 
-## What was built this session (2026-06-23 — GitHub App + webhooks)
+## Latest Session — AI Clarification Loop Working
 
-### GitHub package (`packages/github/`)
+### What changed
 
-**`packages/github/src/app.ts`**
-- Octokit `App` singleton using `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` + `GITHUB_WEBHOOK_SECRET`
-- Will be used by the future diff fetcher and PR comment poster (installation client comes later)
-
-**`packages/github/src/webhooks.ts`**
-- `Webhooks` instance for HMAC-SHA256 signature verification
-- Secret falls back to `""` when env var not set — all requests will 401 until configured
-
-**Dependencies added**: `@octokit/app`, `@octokit/webhooks`
-
-### DB queries
-
-**`packages/db/src/queries/repositories.ts`**
-- `findRepositoryByGithubId(githubRepositoryId: string)` — looks up a `repositories` row by GitHub's integer repo ID (stored as text)
-- Used by the webhook handler to resolve: GitHub repo ID → internal project linkage
-
-**`packages/db/src/queries/pullRequests.ts`**
-- `upsertPullRequest(data)` — insert or update on `(repositoryId, githubPrNumber)` unique index; updates `headSha`, `baseSha`, `status` on conflict
-- `updatePullRequestStatus(repositoryId, githubPrNumber, status)` — sets `"merged"` or `"closed"`
-
-### Webhook route handler
-
-**`apps/web/app/api/webhooks/github/route.ts`** — `POST /api/webhooks/github`
-
-Architecture decision: `verifyAndReceive` was split into two explicit steps:
-1. `webhooks.verify(payload, signature)` — returns `false` on bad secret, never throws; used to gate the 401 response
-2. `webhooks.receive({ id, name, payload })` — fires registered handlers; errors are caught and logged but still return 200 (GitHub should not retry for our internal handler failures)
-
-This split is important: `verifyAndReceive` wraps all handler errors in an `AggregateError` and rethrows, which previously caused handler crashes (e.g. `payload.repository` missing on test payloads) to be returned as 401 instead of 200.
-
-Event handlers registered at module level:
-- `pull_request.opened / synchronize / reopened` → guard `payload.repository`, look up `repositories` row, upsert into `pullRequests` with `status: "open"`
-- `pull_request.closed` → update status to `"merged"` (if `merged === true`) or `"closed"`
-- Silently no-ops if the repo isn't in the `repositories` table
-
-### Other changes
-- `apps/web/package.json` — added `@shipflow/github` and `@shipflow/db` as direct deps
-- `turbo.json` — added `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` to `globalEnv`
+- Added `generateClarification()` using AI SDK v6 `generateText` + `Output.object`.
+- Added strict OpenAI/OpenRouter-compatible schemas: no model-facing `.default()` or optional properties.
+- Added AI provider diagnostics that expose safe status/body details in Inngest failures.
+- Added clarification thread DB queries.
+- Added `feature_request.created` Inngest event and `clarify-request` function.
+- Wired `featureRequests.create` to emit the clarification event asynchronously.
 
 ### Verified working
-- Bad signature → `{"error":"Invalid signature"}` (401) ✅
-- Good signature + minimal payload → `{"ok":true}` (200), handler skips cleanly ✅
-- End-to-end PR write requires a row in `repositories` (currently empty — see next step)
+
+Latest local Inngest run completed end to end:
+
+| Step | Duration |
+|------|----------|
+| `get-feature-request` | 127ms |
+| `get-project-feature-requests` | 144ms |
+| `generate-clarification` | 1.824s |
+| `create-clarification-questions` | 123ms |
+| `set-status-clarifying` | 151ms |
+| `write-clarification-requested-event` | 147ms |
+| Finalization | 143ms |
+
+Expected DB outcome:
+- `feature_requests.status = 'clarifying'`
+- `clarification_threads` contains AI-generated questions
+- `lifecycle_events` contains `clarification_requested`
+
+### Config note
+
+GitHub is still posting to `/api/webhooks` in local logs. The app route is `/api/webhooks/github`, so the GitHub App webhook URL must be updated outside code.
 
 ---
 
-## What was built previously (2026-06-23 — PRD + Tasks data layer)
-
-**`packages/db/src/queries/prds.ts`** — `getPrdForFeatureRequest(featureRequestId, organizationId)`
-- Joins `prds → featureRequests → projects → workspaces`, orders by `version DESC`, returns latest or `null`
-
-**`packages/db/src/queries/tasks.ts`**
-- `listTasksByFeatureRequestId` — full join chain, ordered by `tasks.order ASC`
-- `updateTaskStatus` — simple update
-
-**`packages/api/src/routers/prds.ts`** — `prds.getByFeatureRequestId` (returns `null`, not `NOT_FOUND`)
-
-**`packages/api/src/routers/tasks.ts`** — `tasks.listByFeatureRequest`, `tasks.updateStatus`
-
-**`apps/web/components/feature-request-detail.tsx`**
-- PRD tab: renders all sections (problemStatement, goals, nonGoals, userStories, acceptanceCriteria, edgeCases, successMetrics) with status badge + version number
-- Tasks tab: status-cycle buttons (`todo → in_progress → done`) with remixicon icons, per-task badge, React Query invalidation
-
----
-
-## Missing / Not Started ❌
+## Still Missing / Not Started ❌
 
 | Area | Gap | Depends on |
 |------|-----|------------|
-| **Repo → project linking** | `repositories` table is empty; no UI or tRPC router to link a GitHub repo to a project | GitHub App installed on repo |
-| **Inngest package** | `packages/inngest/` is empty — no event definitions, no workflow functions | Repo linked to project (so PR webhooks persist) |
-| **AI package** | `packages/ai/` is empty — no prompts, no Zod schemas, no structured output calls | Inngest wired |
-| **GitHub diff fetcher** | `packages/github/` has no Octokit installation client, no diff fetcher, no PR comment poster | Inngest workflow triggering it |
-| **PRD generation workflow** | No Inngest function to take a feature request → call AI → write PRD + tasks to DB | AI + Inngest |
-| **Code review workflow** | No review run creation, no issue parsing, no re-review loop, no `reviewRuns` rows | All AI/Inngest |
-| **FR detail tabs 4–5** | Review History / Audit Log are `<ComingSoon />` stubs | `lifecycleEvents` rows (written by AI workflows) |
-| **Billing** | `packages/billing/` is empty — no Polar client, no credit enforcement | Inngest wired |
-| **Release approval UI** | No approval action bar, no readiness check | Review workflow complete |
+| Clarification answer flow | No UI/tRPC procedure to answer AI clarification questions | Clarification loop ✅ |
+| PRD generation workflow | No `clarification.answered` → AI PRD generation → `prds` insert → `prd_generated` status | Answer flow |
+| PRD approval workflow | No `prd.approve` procedure/event to trigger task generation | PRD generation |
+| Task generation workflow | No `prd.approved` → AI task generation → `tasks` inserts | PRD approval |
+| PR → feature request linking | `pull_requests.feature_request_id` is not assigned; review context can be missing | Repo/PR flow |
+| GitHub diff fetcher/commenter | No PR diff fetch helper or PR review/comment poster yet | Review workflow |
+| Code review workflow | No `reviewRuns` / `reviewIssues` AI review function | PRD/tasks + PR linking |
+| Review/Audit tabs | Review History and Audit Log UI still stubbed | Review/lifecycle query routers |
+| Approval flow | No release readiness check or human approval action bar | Review passed state |
+| Billing | `packages/billing` still placeholder; no Polar credits/checkout/webhooks | After review loop works |
 
 ---
 
-## Issues / Wrong Calls
+## Issues / Notes
 
 | Issue | Location | Severity |
 |-------|----------|----------|
-| 3 packages completely empty | `packages/ai`, `packages/inngest`, `packages/billing` | High — core product workflows |
-| `featureRequests.list` scoped to single `projectId` | `packages/api/src/routers/featureRequests.ts` | Low — fine for now |
+| GitHub webhook URL is configured as `/api/webhooks` somewhere outside code | GitHub App settings / tunnel config | High for GitHub PR webhook testing |
+| `featureRequests.list` is scoped to one `projectId` | `packages/api/src/routers/featureRequests.ts` | Low for now |
+| Existing lint warnings remain in UI/web files | `packages/ui`, `apps/web` | Low, unrelated to AI workflow |
 
 ---
 
-## Next Steps — Detailed
+## Next Step — Clarification Answers → PRD Generation
 
-### Step 4b: Repo → Project linking (immediate unblock)
+**Goal**: turn the working clarification loop into the first complete product planning loop.
 
-**Why**: The `repositories` table is empty. Every `pull_request` webhook arrives, passes signature verification, then silently no-ops in the handler because `findRepositoryByGithubId` returns `null`. Nothing writes to `pullRequests` until at least one `repositories` row exists.
+1. Add clarification DB queries:
+   - list unanswered questions for a feature request
+   - update answers for clarification thread rows
 
-**What to build**:
+2. Add `featureRequests.answerClarification` tRPC procedure:
+   - input: `{ featureRequestId, answers: Array<{ clarificationThreadId, answer }> }`
+   - validate tenant access through org/project/workspace join
+   - persist answers
+   - emit `clarification.answered`
 
-1. **`packages/api/src/routers/repositories.ts`** (new tRPC router)
-   - `repositories.link: tenantProcedure`
-     - Input: `{ projectId: uuid, installationId: string, githubRepositoryId: string, owner: string, name: string, defaultBranch?: string }`
-     - Inserts into `repositories` table
-     - Must validate `projectId` belongs to `ctx.activeOrganizationId` (join through workspaces)
-     - Returns the created row
-   - `repositories.listByProject: tenantProcedure`
-     - Input: `{ projectId: uuid }`
-     - Returns all repos linked to a project
+3. Add AI PRD generation:
+   - `packages/ai/src/generatePrd.ts`
+   - use existing PRD prompt/schema with `generateText` + `Output.object`
+   - keep provider diagnostics
 
-2. **`packages/db/src/queries/repositories.ts`** (extend existing)
-   - Add `createRepository(data)` — insert and return
-   - Add `listRepositoriesByProject(projectId)` — simple select
+4. Add DB write support:
+   - `createPrd(featureRequestId, prdOutput)`
+   - update feature request status to `prd_generated`
+   - write lifecycle event `prd_generated`
 
-3. **Dashboard UI** — a "Link Repository" flow somewhere accessible:
-   - Option A: Project settings page at `/dashboard/projects/[id]/settings` (cleanest but requires a new page)
-   - Option B: Inline on the dashboard sidebar or existing project card (faster to ship)
-   - The form needs: the GitHub installation ID (from the webhook payload `installation.id`) and the repo details
-   - The installation ID comes from the GitHub App installation — the user can find it at `github.com/settings/installations` or from a webhook delivery payload under `installation.id`
+5. Add Inngest function:
+   - event: `clarification.answered`
+   - function: `generate-prd`
+   - load feature request + clarification answers
+   - generate and insert PRD
 
-4. **Register router** in `packages/api/src/router.ts`
-
-**How to get the installationId**: Check any recent webhook delivery in GitHub App → Advanced → Recent Deliveries → payload → `installation.id`. It's an integer like `12345678`.
-
----
-
-### Step 5: Inngest wiring
-
-**Why**: Once PRs are persisting to the `pullRequests` table, the next trigger point is firing an Inngest event when a PR opens/updates so the AI review workflow can begin.
-
-**What to build**:
-
-1. **`packages/inngest/`** — wire up as a real TypeScript package (same pattern as `packages/github/`)
-   - `src/client.ts` — `new Inngest({ id: "shipflow" })` using `INNGEST_EVENT_KEY`
-   - `src/events.ts` — typed event definitions:
-     ```typescript
-     type Events = {
-       "github/pull_request.opened": { data: { pullRequestId: string; repositoryId: string; featureRequestId?: string } }
-       "github/pull_request.synchronized": { data: { pullRequestId: string; headSha: string } }
-     }
-     ```
-   - `src/index.ts` — re-exports
-
-2. **`apps/web/app/api/inngest/route.ts`** — Inngest serve handler
-   - `serve({ client: inngest, functions: [...] })`
-   - Mount at `/api/inngest` (Inngest dashboard connects here)
-
-3. **Wire webhook → Inngest event**: In `apps/web/app/api/webhooks/github/route.ts`, after `upsertPullRequest` succeeds, call `inngest.send("github/pull_request.opened", { data: { ... } })`
-
-4. **First Inngest function** (stub that proves the chain works):
-   - `src/functions/onPullRequestOpened.ts`
-   - Triggered by `"github/pull_request.opened"`
-   - For now: just logs the event and writes a `lifecycleEvents` row with `event: "pr_received"`, `actorType: "system"`
-   - This makes the Audit Log tab show real data for the first time
-
----
-
-### Step 6: AI SDK integration
-
-**Why**: Once Inngest is wired, each function can call the AI package to generate PRDs and run code review.
-
-**What to build**:
-
-1. **`packages/ai/`** — wire as a real package
-   - `src/client.ts` — `createOpenRouter(apiKey)` from `@openrouter/ai-sdk-provider`, default model from `AI_MODEL` env var
-   - `src/schemas/prd.ts` — Zod schema matching the `prds` table columns (problemStatement, goals[], nonGoals[], userStories[], acceptanceCriteria[], edgeCases[], successMetrics[])
-   - `src/schemas/reviewIssue.ts` — Zod schema for a single code review issue (file, line, severity, description, suggestion)
-   - `src/prompts/generatePrd.ts` — system + user prompt for PRD generation from `rawInput`
-   - `src/prompts/reviewDiff.ts` — system + user prompt for code review from a PR diff
-
-2. **Inngest function: PRD generation**
-   - Triggered when a feature request reaches `status: "clarifying"` or manually triggered
-   - Calls `generateText` with `Output.object({ schema: prdSchema })`
-   - Writes the result to `prds` table via `createPrd()`
-   - Updates FR status to `"prd_generated"`
-   - Writes a `lifecycleEvents` row
-
-3. **Inngest function: code review**
-   - Triggered by `"github/pull_request.opened"` or `"github/pull_request.synchronized"`
-   - Fetches the PR diff using the Octokit installation client (needs to be added to `packages/github/`)
-   - Calls AI with the diff
-   - Writes `reviewRuns` + `reviewIssues` rows
-   - Posts a PR comment via Octokit
-   - Updates FR status appropriately
+6. Minimal UI:
+   - in feature request detail, when status is `clarifying`, show AI questions and answer inputs
+   - submit answers and refresh detail page
+   - PRD tab should then show generated PRD
 
 ---
 
 ## Build Sequence Reference
 
 ```
-Step 1: Monorepo + auth          ✅ Done
-Step 2: Feature request CRUD     ✅ Done
-Step 3: Feature request detail   ✅ Done (Overview + PRD + Tasks live; Reviews/Audit stubbed)
-Step 4: GitHub App + webhooks    ✅ Done (HMAC verified; pull_request → pullRequests table)
-Step 4b: Repo → project linking  ← DO THIS NEXT (repositories table empty; blocks all PR persistence)
-Step 5: Inngest wiring           ← after 4b (webhook → Inngest event → lifecycleEvents first data)
-Step 6: AI SDK integration       ← after 5 (PRD generation + code review functions)
-Step 7: Billing                  ← after 5 (credit enforcement in Inngest functions)
-Step 8: Polish + demo
+Step 1: Monorepo + auth                         ✅ Done
+Step 2: Feature request CRUD                    ✅ Done
+Step 3: Feature request detail shell            ✅ Done
+Step 4: GitHub App + webhooks                   ✅ Done
+Step 4b: Repo → project linking                 ✅ Done
+Step 5: Inngest foundation                      ✅ Done
+Step 6a: AI package foundation                  ✅ Done
+Step 6b: Feature request clarification loop     ✅ Done
+Step 6c: Clarification answers → PRD generation ← DO THIS NEXT
+Step 6d: PRD approval → task generation         ← After 6c
+Step 7: PR linking + AI review                  ← After PRD/tasks
+Step 8: Approval + billing + polish             ← After review loop
 ```

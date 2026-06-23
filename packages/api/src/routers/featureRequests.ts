@@ -2,7 +2,9 @@ import {
   createFeatureRequest,
   getFeatureRequestById,
   getFeatureRequestForOrg,
+  listClarificationThreadsByFeatureRequestId,
   listFeatureRequestsByProject,
+  updateClarificationAnswers,
   updateFeatureRequestStatus,
 } from "@shipflow/db"
 import { inngest } from "@shipflow/inngest"
@@ -55,6 +57,15 @@ export const featureRequestsRouter = createTRPCRouter({
       return fr
     }),
 
+  listClarifications: tenantProcedure
+    .input(z.object({ featureRequestId: z.string().uuid() }))
+    .query(({ input, ctx }) =>
+      listClarificationThreadsByFeatureRequestId(
+        input.featureRequestId,
+        ctx.activeOrganizationId
+      )
+    ),
+
   create: tenantProcedure
     .input(
       z.object({
@@ -82,6 +93,104 @@ export const featureRequestsRouter = createTRPCRouter({
         })
 
       return featureRequest
+    }),
+
+  answerClarification: tenantProcedure
+    .input(
+      z.object({
+        featureRequestId: z.string().uuid(),
+        answers: z
+          .array(
+            z.object({
+              clarificationThreadId: z.string().uuid(),
+              answer: z.string().trim().min(1),
+            })
+          )
+          .min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const featureRequest = await getFeatureRequestForOrg(
+        input.featureRequestId,
+        ctx.activeOrganizationId
+      )
+
+      if (!featureRequest) throw new TRPCError({ code: "NOT_FOUND" })
+
+      if (featureRequest.status !== "clarifying") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Clarification answers can only be submitted while clarifying.",
+        })
+      }
+
+      const threads = await listClarificationThreadsByFeatureRequestId(
+        input.featureRequestId,
+        ctx.activeOrganizationId
+      )
+
+      if (threads.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No clarification questions found for this feature request.",
+        })
+      }
+
+      const threadsById = new Map(threads.map((thread) => [thread.id, thread]))
+      const answersByThreadId = new Map(
+        input.answers.map((answer) => [
+          answer.clarificationThreadId,
+          answer.answer.trim(),
+        ])
+      )
+
+      const unknownAnswer = input.answers.find(
+        (answer) => !threadsById.has(answer.clarificationThreadId)
+      )
+
+      if (unknownAnswer) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "One or more clarification answers do not belong here.",
+        })
+      }
+
+      const unansweredThreads = threads.filter(
+        (thread) => !thread.answer || thread.answer.trim().length === 0
+      )
+      const missingAnswer = unansweredThreads.find(
+        (thread) => !answersByThreadId.has(thread.id)
+      )
+
+      if (missingAnswer) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Please answer every clarification question before submitting.",
+        })
+      }
+
+      const updatedAnswers =
+        unansweredThreads.length > 0
+          ? await updateClarificationAnswers({
+              featureRequestId: input.featureRequestId,
+              answers: unansweredThreads.map((thread) => ({
+                id: thread.id,
+                answer: answersByThreadId.get(thread.id)!,
+              })),
+            })
+          : []
+
+      await inngest.send({
+        name: "clarification.answered",
+        data: {
+          featureRequestId: input.featureRequestId,
+          organizationId: ctx.activeOrganizationId,
+        },
+      })
+
+      return {
+        submitted: updatedAnswers.length,
+      }
     }),
 
   updateStatus: tenantProcedure

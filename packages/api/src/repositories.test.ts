@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   createRepository: vi.fn(),
   findGithubInstallation: vi.fn(),
   getAccessToken: vi.fn(),
-  getUserInstallationRepo: vi.fn(),
+  getInstallationRepo: vi.fn(),
   listProjectsByOrg: vi.fn(),
 }))
 
@@ -22,7 +22,7 @@ vi.mock("@shipflow/db", async (importOriginal) => ({
 }))
 
 vi.mock("@shipflow/github", () => ({
-  getUserInstallationRepo: mocks.getUserInstallationRepo,
+  getInstallationRepo: mocks.getInstallationRepo,
 }))
 
 import { createContextFromSession } from "./context"
@@ -78,7 +78,7 @@ describe("secure repository linking", () => {
       organizationId: "org-1",
     })
     mocks.getAccessToken.mockResolvedValue({ accessToken: "secret-user-token" })
-    mocks.getUserInstallationRepo.mockResolvedValue({
+    mocks.getInstallationRepo.mockResolvedValue({
       id: "456",
       owner: "trusted-owner",
       name: "trusted-repo",
@@ -113,8 +113,8 @@ describe("secure repository linking", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" })
   })
 
-  it("requires a valid linked GitHub credential", async () => {
-    mocks.getAccessToken.mockRejectedValue(new Error("revoked"))
+  it("requires repository access through the installation", async () => {
+    mocks.getInstallationRepo.mockResolvedValue(null)
 
     await expect(
       caller().repositories.link({
@@ -122,7 +122,7 @@ describe("secure repository linking", () => {
         installationId: "123",
         githubRepositoryId: "456",
       })
-    ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" })
   })
 
   it("persists only metadata returned by GitHub", async () => {

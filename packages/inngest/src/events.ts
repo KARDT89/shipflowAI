@@ -5,6 +5,12 @@ export type Events = {
       organizationId: string
     }
   }
+  "clarification.answered": {
+    data: {
+      featureRequestId: string
+      organizationId: string
+    }
+  }
   "github/pull_request.opened": {
     data: {
       pullRequestId: string

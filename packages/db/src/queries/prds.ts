@@ -1,7 +1,47 @@
-import { desc, and, eq } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 
 import { db } from "../client"
 import { prds, featureRequests, projects, workspaces } from "../schema/domain"
+
+type CreatePrdInput = {
+  featureRequestId: string
+  problemStatement: string
+  goals: string[]
+  nonGoals: string[]
+  userStories: string[]
+  acceptanceCriteria: string[]
+  edgeCases: string[]
+  successMetrics: string[]
+}
+
+export async function createPrd({
+  featureRequestId,
+  problemStatement,
+  goals,
+  nonGoals,
+  userStories,
+  acceptanceCriteria,
+  edgeCases,
+  successMetrics,
+}: CreatePrdInput) {
+  const [row] = await db
+    .insert(prds)
+    .values({
+      featureRequestId,
+      problemStatement,
+      goals,
+      nonGoals,
+      userStories,
+      acceptanceCriteria,
+      edgeCases,
+      successMetrics,
+      status: "draft",
+      version: 1,
+    })
+    .returning()
+
+  return row!
+}
 
 export async function getPrdForFeatureRequest(
   featureRequestId: string,

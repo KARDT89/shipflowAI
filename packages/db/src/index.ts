@@ -11,10 +11,11 @@ export {
   listProjectsByOrg,
   createWorkspaceWithProject,
 } from "./queries/projects"
-export { getPrdForFeatureRequest } from "./queries/prds"
+export { createPrd, getPrdForFeatureRequest } from "./queries/prds"
 export {
   createClarificationQuestions,
   listClarificationThreadsByFeatureRequestId,
+  updateClarificationAnswers,
 } from "./queries/clarificationThreads"
 export { listTasksByFeatureRequestId, updateTaskStatus } from "./queries/tasks"
 export {
