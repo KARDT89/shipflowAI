@@ -5,6 +5,7 @@ import {
   listFeatureRequestsByProject,
   updateFeatureRequestStatus,
 } from "@shipflow/db"
+import { inngest } from "@shipflow/inngest"
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 
@@ -61,12 +62,26 @@ export const featureRequestsRouter = createTRPCRouter({
         rawInput: z.string().min(1),
       })
     )
-    .mutation(({ input, ctx }) => {
-      return createFeatureRequest({
+    .mutation(async ({ input, ctx }) => {
+      const featureRequest = await createFeatureRequest({
         projectId: input.projectId,
         rawInput: input.rawInput,
         createdBy: ctx.session.user.id,
       })
+
+      await inngest
+        .send({
+          name: "feature_request.created",
+          data: {
+            featureRequestId: featureRequest!.id,
+            organizationId: ctx.activeOrganizationId,
+          },
+        })
+        .catch((err) => {
+          console.error("[featureRequests.create] inngest.send error", err)
+        })
+
+      return featureRequest
     }),
 
   updateStatus: tenantProcedure

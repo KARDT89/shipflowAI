@@ -7,6 +7,7 @@ import {
   upsertPullRequest,
 } from "@shipflow/db"
 import { getWebhooks } from "@shipflow/github"
+import { inngest } from "@shipflow/inngest"
 
 const webhooks = getWebhooks()
 
@@ -18,7 +19,7 @@ webhooks.on(
       payload.repository.id.toString()
     )
     if (!repo) return
-    await upsertPullRequest({
+    const pr = await upsertPullRequest({
       repositoryId: repo.id,
       githubPrNumber: payload.pull_request.number,
       headSha: payload.pull_request.head.sha,
@@ -26,6 +27,20 @@ webhooks.on(
       status: "open",
       openedAt: new Date(payload.pull_request.created_at),
     })
+    if (pr) {
+      await inngest
+        .send({
+          name: "github/pull_request.opened",
+          data: {
+            pullRequestId: pr.id,
+            repositoryId: repo.id,
+            githubPrNumber: payload.pull_request.number,
+          },
+        })
+        .catch((err) => {
+          console.error("[github webhook] inngest.send error", err)
+        })
+    }
   }
 )
 

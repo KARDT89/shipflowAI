@@ -49,6 +49,12 @@ export async function findRepositoryByGithubId(githubRepositoryId: string) {
   })
 }
 
+export async function getRepositoryById(id: string) {
+  return db.query.repositories.findFirst({
+    where: eq(repositories.id, id),
+  })
+}
+
 export async function createRepository(data: {
   projectId: string
   githubInstallationId: string

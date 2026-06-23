@@ -12,12 +12,17 @@ export {
   createWorkspaceWithProject,
 } from "./queries/projects"
 export { getPrdForFeatureRequest } from "./queries/prds"
+export {
+  createClarificationQuestions,
+  listClarificationThreadsByFeatureRequestId,
+} from "./queries/clarificationThreads"
 export { listTasksByFeatureRequestId, updateTaskStatus } from "./queries/tasks"
 export {
   findGithubInstallation,
   listGithubInstallationsByOrganization,
   upsertGithubInstallation,
   findRepositoryByGithubId,
+  getRepositoryById,
   createRepository,
   listRepositoriesByProject,
   deleteRepositoriesByInstallationId,
@@ -27,4 +32,5 @@ export {
   upsertPullRequest,
   updatePullRequestStatus,
 } from "./queries/pullRequests"
+export { createLifecycleEvent } from "./queries/lifecycleEvents"
 export * from "./schema/index"

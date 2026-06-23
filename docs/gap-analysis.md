@@ -39,7 +39,7 @@ Currently `upsertPullRequest` has no `featureRequestId` field in the webhook han
 
 **Fix options (pick one):**
 - A: UI flow — user manually links a PR to a feature request from the FR detail page
-- B: Auto-link — when a PR is opened against a branch named `fr-{id}` or similar convention
+- B: Auto-link — when a PR is opened against a branch named `fr-{id}` or similar convention  
 - C: Allow unlinked PRs, but block review run if no FR is associated (surface in UI)
 
 Option C is closest to the PRD's edge case handling: *"PR opened against a repo not yet linked to a feature request → event stored, surfaced as 'unlinked PR' for manual association."*
@@ -64,7 +64,7 @@ Review History and Audit Log tabs show `<ComingSoon />`. These will be unblocked
 PRD specifies separate page routes per section:
 ```
 /feature-requests/[id]/prd
-/feature-requests/[id]/tasks
+/feature-requests/[id]/tasks  
 /feature-requests/[id]/reviews
 ```
 Current implementation uses tabs on one page at `/dashboard/feature-requests/[id]`.
